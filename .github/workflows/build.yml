@@ -1,0 +1,74 @@
+name: Python package
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_NAME: ${{ github.repository.split('/')[1] }}
+      PACKAGE_VERSION: ${{ github.ref_name.slice(1) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install poetry
+        run: pipx install poetry
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'poetry'
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run linting
+        run: poetry run pre-commit run --all-files
+
+      - name: Publish to PyPI
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          poetry self add "poetry-dynamic-versioning[plugin]" --no-interaction
+          poetry config pypi-token.pypi $PYPI_TOKEN
+
+          # Split package name and version by space
+          read -r PACKAGE_NAME PACKAGE_VERSION <<< "$(poetry version --no-ansi)"
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
+          echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
+
+          poetry publish --build --no-interaction && echo "published=1" >> "$GITHUB_ENV" || echo "published=0" >> "$GITHUB_ENV"
+
+
+      - name: Check if published
+        run: |
+          if [ "$published" = "1" ]; then
+            echo "Published to PyPI"
+          else
+            echo "Failed to publish to PyPI"
+            exit 1
+          fi
+
+      - name: Make release with docset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body: |
+            This is a release for the ${{ github.ref }} tag.
+
+            PyPi package: [${{ env.PACKAGE_NAME }}==${{ env.PACKAGE_VERSION }}](https://pypi.org/project/${{ env.PACKAGE_NAME }}/${{ env.PACKAGE_VERSION }})
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          append_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

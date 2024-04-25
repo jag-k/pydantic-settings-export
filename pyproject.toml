@@ -1,0 +1,149 @@
+[tool.poetry]
+name = "pydantic-settings-export"
+version = "0.0.0"
+description = "Export your Pydantic settings to a Markdown and .env.example files!"
+authors = ["Jag_k <jag-k@users.noreply.github.com>"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Documentation",
+    "Topic :: Utilities",
+    "Environment :: Console",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+
+]
+readme = "README.md"
+license = "MIT"
+repository = "https://github.com/jag-k/pydantic-settings-export"
+homepage = "https://github.com/jag-k/pydantic-settings-export#readme"
+packages = [
+    { include = "pydantic_settings_export", from = "." },
+]
+
+[tool.poetry.scripts]
+pydantic-settings-export = "pydantic_settings_export.cli:main"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pydantic = "^2"
+pydantic-settings = "^2"
+
+
+[tool.poetry.group.dev.dependencies]
+ruff = "*"
+ruff-lsp = "*"
+pre-commit = "*"
+ssort = "^0.13.0"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
+
+[tool.poetry-dynamic-versioning.substitution]
+files = [
+    "pydantic_settings_export/version.py",
+]
+
+[tool.poetry-dynamic-versioning.files."pydantic_settings_export/version.py"]
+persistent-substitution = true
+initial-content = """
+# These version placeholders will be replaced later during substitution.
+__version__ = "0.0.0"
+__version_tuple__ = (0, 0, 0)
+"""
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+
+# https://docs.astral.sh/ruff/
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [
+    ".idea",
+    ".vscode",
+    ".fleet",
+]
+
+# https://docs.astral.sh/ruff/settings/#lint
+[tool.ruff.lint]
+ignore-init-module-imports = true
+select = [
+    'F', # flake8
+    'I', # isort
+    'B', # flake8-bugbear
+    'D', # pydocstyle
+    'W', # pycodestyle (warnings)
+    'E', # pycodestyle (errors)
+    'N', # pep8-naming
+    'PT', # flake8-pytest-style
+    'C90', # mccabe
+]
+ignore = [
+    'B012', # {name} inside finally blocks cause exceptions to be silenced
+    'D100', # Missing docstring in public module
+    'D104', # Missing docstring in public package
+    'D105', # Missing docstring in magic method
+    'D106', # Missing docstring in public nested class
+    'D107', # Missing docstring in __init__
+    'D203', # 1 blank line required before class docstring
+    'D401', # First line of docstring should be in imperative mood: "{first_line}"
+    'D404', # First word of the docstring should not be "This"
+    'D207', # Docstring is under-indented
+    'D208', # Docstring is over-indented
+]
+
+
+
+# https://docs.astral.sh/ruff/settings/#extend-per-file-ignores
+[tool.ruff.lint.extend-per-file-ignores]
+'__init__.py' = [
+    'F401', # {name} imported but unused; consider using importlib.util.find_spec to test for availability
+    'F403', # from {name} import * used; unable to detect undefined names
+    'F405', # {name} may be undefined, or defined from star imports
+]
+
+# https://docs.astral.sh/ruff/settings/#lintpydocstyle
+[tool.ruff.lint.pydocstyle]
+convention = 'pep257'
+
+
+# https://docs.astral.sh/ruff/settings/#lintmccabe
+[tool.ruff.lint.mccabe]
+max-complexity = 6
+
+# https://docs.astral.sh/ruff/settings/#lintisort
+[tool.ruff.lint.isort]
+section-order = [
+    'future',
+    'standard-library',
+    'third-party',
+    'first-party',
+    'local-folder',
+]
+known-first-party = ["pydantic_settings_export"]
+lines-after-imports = 2
+lines-between-types = 1
+
+# https://github.com/jag-k/pydantic-settings-export
+[tool.pydantic_settings_export]
+project_dir = "."
+default_settings = [
+    "pydantic_settings_export.settings:Settings",
+]
+dotenv = {"name" = ".env.example"}
+
+[tool.pydantic_settings_export.markdown]
+name = "Configuration.md"
+save_dirs = [
+    "docs",
+    "wiki",
+]
