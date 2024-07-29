@@ -54,7 +54,7 @@ repos:
         entry: ssort
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.0
+    rev: v0.5.5
     hooks:
       # Run the linter.
       - id: ruff
