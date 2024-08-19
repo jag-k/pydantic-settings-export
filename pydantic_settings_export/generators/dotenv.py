@@ -4,7 +4,6 @@ from pydantic_settings_export.models import SettingsInfoModel
 
 from .abstract import AbstractGenerator
 
-
 __all__ = ("DotEnvGenerator",)
 
 
@@ -14,10 +13,10 @@ class DotEnvGenerator(AbstractGenerator):
     def write_to_files(self, generated_result: str) -> list[Path]:
         """Write the generated content to files.
 
-        :param generated_result: The result to write to files.
-        :return: The list of file paths written to.
+        :param generated_result: The result is to write to files.
+        :return: The list of file paths is written to.
         """
-        file_path = self.settings.project_dir / self.settings.dotenv.name
+        file_path = self.settings.root_dir / self.settings.dotenv.name
         file_path.write_text(generated_result)
         return [file_path]
 

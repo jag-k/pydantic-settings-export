@@ -4,7 +4,6 @@ from pathlib import Path
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import Settings
 
-
 __all__ = ("AbstractGenerator",)
 
 
@@ -40,8 +39,8 @@ class AbstractGenerator(ABC):
     def write_to_files(self, generated_result: str) -> list[Path]:
         """Write the generated content to files.
 
-        :param generated_result: The result to write to files.
-        :return: The list of file paths written to.
+        :param generated_result: The result is to write to files.
+        :return: The list of file paths is written to.
         """
         raise NotImplementedError
 
@@ -51,8 +50,8 @@ class AbstractGenerator(ABC):
 
         :param settings: The settings for the generator.
         :param settings_info: The settings info to generate documentation for.
-        :return: The list of file paths written to.
+        :return: The list of file paths is written to.
         """
         generator = cls(settings)
         result = generator.generate(settings_info)
-        return generator.write_to_files(result)
+        return [path.resolve().absolute() for path in generator.write_to_files(result)]
