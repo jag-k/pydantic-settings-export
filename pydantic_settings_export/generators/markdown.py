@@ -6,7 +6,6 @@ from pydantic_settings_export.utils import make_pretty_md_table_from_dict
 
 from .abstract import AbstractGenerator
 
-
 __all__ = ("MarkdownGenerator",)
 
 
@@ -42,7 +41,7 @@ class MarkdownGenerator(AbstractGenerator):
         # Generate fields
         rows: list[TableRowDict] = [
             TableRowDict(
-                Name=f"`{settings_info.env_prefix}{field.name.upper()}`",
+                Name=f"`{field.alias.upper()}`" if field.alias else f"`{settings_info.env_prefix}{field.name.upper()}`",
                 Type=f"`{field.type}`",
                 Default=f"`{field.default}`" if not field.is_required else "*required*",
                 Description=field.description,

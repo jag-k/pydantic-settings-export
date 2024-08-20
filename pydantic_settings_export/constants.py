@@ -3,7 +3,6 @@ from typing import Annotated
 
 from pydantic import BeforeValidator, SecretStr
 
-
 __all__ = (
     "StrAsPath",
     "FIELD_TYPE_MAP",

@@ -6,7 +6,6 @@ from pydantic_settings_export.generators import AbstractGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import Settings
 
-
 __all__ = ("Exporter",)
 
 
@@ -25,7 +24,7 @@ class Exporter:
         """Run all generators for the given settings.
 
         :param settings: The settings to generate documentation for.
-        :return: The paths to generated documentations.
+        :return: The paths to generated documentation.
         """
         settings_infos: list[SettingsInfoModel] = [
             SettingsInfoModel.from_settings_model(s, self.settings) for s in settings

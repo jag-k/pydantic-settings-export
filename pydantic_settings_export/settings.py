@@ -1,12 +1,13 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from pydantic import Field, ImportString
+from dotenv import load_dotenv
+from pydantic import Field, ImportString, TypeAdapter, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export.constants import StrAsPath
+from pydantic_settings_export.sources import SourcesMixin
 from pydantic_settings_export.utils import get_config_from_pyproject_toml
-
 
 if TYPE_CHECKING:
     from pydantic_settings_export.generators.abstract import AbstractGenerator  # noqa: F401
@@ -17,6 +18,14 @@ __all__ = (
     "RelativeToSettings",
     "Settings",
 )
+
+
+def import_settings_from_string(value: str) -> BaseSettings:
+    """Import the settings from the string."""
+    obj = TypeAdapter(ImportString).validate_python(value)
+    if isinstance(obj, type) and not issubclass(obj, BaseSettings) and not isinstance(obj, BaseSettings):
+        raise ValueError(f"The {obj!r} is not a settings class.")
+    return obj
 
 
 class RelativeToSettings(BaseSettings):
@@ -32,7 +41,7 @@ class RelativeToSettings(BaseSettings):
 
 
 class MarkdownSettings(BaseSettings):
-    """Settings for the markdown file."""
+    """Settings for the Markdown file."""
 
     model_config = SettingsConfigDict(
         title="Configuration File Settings",
@@ -62,7 +71,7 @@ class DotEnvSettings(BaseSettings):
     name: str = Field(".env.example", description="The name of the .env file.")
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings, SourcesMixin):
     """Global settings for pydantic_settings_export."""
 
     model_config = SettingsConfigDict(
@@ -75,9 +84,14 @@ class Settings(BaseSettings):
         },
     )
 
-    default_settings: list[ImportString] = Field(
+    default_settings: list[str] = Field(
         default_factory=list,
         description="The default settings to use. The settings are applied in the order they are listed.",
+    )
+
+    root_dir: Path = Field(
+        Path.cwd(),
+        description="The project directory. Used for relative paths in the configuration file and .env file.",
     )
 
     project_dir: Path = Field(
@@ -109,11 +123,38 @@ class Settings(BaseSettings):
         exclude=True,
     )
 
+    env_file: Path | None = Field(
+        None,
+        description=(
+            "The path to the `.env` file to load environment variables. "
+            "Useful, then you have a Settings class/instance, which require values while running."
+        ),
+    )
+
+    @property
+    def settings(self) -> list[BaseSettings]:
+        """Get the settings."""
+        return [import_settings_from_string(i) for i in self.default_settings or []]
+
+    # noinspection PyNestedDecorators
+    @model_validator(mode="before")
+    @classmethod
+    def validate_env_file(cls, data: Any) -> Any:
+        """Validate the env file."""
+        if isinstance(data, dict):
+            file = data.get("env_file")
+            if file is not None:
+                f = Path(file)
+                if f.is_file():
+                    print("Loading env file", f)
+                    load_dotenv(file)
+        return data
+
     @classmethod
     def from_pyproject(cls, base_path: Path | None = None) -> Self:
         """Load settings from the pyproject.toml file.
 
-        :param base_path: The base path to search for the pyproject.toml file, or this file itself.
+        :param base_path: The base path to search for the pyproject.toml file or this file itself.
         The current working directory is used by default.
         :return: The loaded settings.
         """

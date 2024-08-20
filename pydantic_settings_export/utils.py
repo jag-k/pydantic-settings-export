@@ -2,10 +2,8 @@ import argparse
 import importlib
 import sys
 import tomllib
-
 from pathlib import Path
 from typing import Any
-
 
 __all__ = (
     "find_pyproject_toml",
@@ -91,7 +89,7 @@ def get_tool_name(settings: type[BaseSettings]) -> str | None:
 def get_config_from_pyproject_toml(settings: type[BaseSettings], base_path: Path | None = None) -> dict:
     """Get the configuration from the pyproject.toml file.
 
-    :param base_path: The base path to search for the pyproject.toml file, or this file itself.
+    :param base_path: The base path to search for the pyproject.toml file or this file itself.
         The current working directory is used by default.
     :param settings: The settings class to create the settings from.
     :return: The created settings.
@@ -128,7 +126,7 @@ class ObjectImportAction(argparse.Action):
     def import_obj(value: str) -> Any:
         """Import the object from the module.
 
-        :param value: The value in the format 'module:class'.
+        :param value: The value in the format is 'module:class'.
         :raise ValueError: If the value is not in the format 'module:class'.
         :raise ValueError: If the class is not in the module.
         :raise ModuleNotFoundError: If the module is not found.

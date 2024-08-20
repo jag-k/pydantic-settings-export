@@ -2,7 +2,7 @@
 name = "pydantic-settings-export"
 version = "0.0.0"
 description = "Export your Pydantic settings to a Markdown and .env.example files!"
-authors = ["Jag_k <jag-k@users.noreply.github.com>"]
+authors = ["Jag_k <30597878+jag-k@users.noreply.github.com>"]
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -38,7 +38,7 @@ pydantic-settings = "^2"
 ruff = "*"
 ruff-lsp = "*"
 pre-commit = "*"
-ssort = "^0.13.0"
+ssort = "*"
 
 [tool.poetry-dynamic-versioning]
 enable = true
@@ -75,7 +75,6 @@ extend-exclude = [
 
 # https://docs.astral.sh/ruff/settings/#lint
 [tool.ruff.lint]
-ignore-init-module-imports = true
 select = [
     'F', # flake8
     'I', # isort
@@ -130,8 +129,6 @@ section-order = [
     'local-folder',
 ]
 known-first-party = ["pydantic_settings_export"]
-lines-after-imports = 2
-lines-between-types = 1
 
 # https://github.com/jag-k/pydantic-settings-export
 [tool.pydantic_settings_export]
@@ -140,6 +137,8 @@ default_settings = [
     "pydantic_settings_export.settings:Settings",
 ]
 dotenv = {"name" = ".env.example"}
+env_file = ".env"
+
 
 [tool.pydantic_settings_export.markdown]
 name = "Configuration.md"

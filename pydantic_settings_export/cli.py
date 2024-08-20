@@ -1,33 +1,20 @@
 import argparse
-
+import os
+import sys
 from collections.abc import Sequence
 from inspect import isclass
 from pathlib import Path
 from typing import Any
 
-from pydantic_settings import BaseSettings
+from dotenv import dotenv_values
 
 from pydantic_settings_export.exporter import Exporter
 from pydantic_settings_export.generators import ALL_GENERATORS, AbstractGenerator
-from pydantic_settings_export.settings import Settings
+from pydantic_settings_export.settings import Settings, import_settings_from_string
 from pydantic_settings_export.utils import ObjectImportAction
 from pydantic_settings_export.version import __version__
 
-
 CDW = Path.cwd()
-
-
-class SettingsAction(ObjectImportAction):
-    """The settings action."""
-
-    @staticmethod
-    def callback(obj: Any) -> type[BaseSettings]:
-        """Check if the object is a settings class."""
-        if isclass(obj) and issubclass(obj, BaseSettings):
-            return obj
-        elif not isclass(obj) and isinstance(obj, BaseSettings):
-            return obj.__class__
-        raise ValueError(f"The {obj!r} is not a settings class.")
 
 
 class GeneratorAction(ObjectImportAction):
@@ -64,7 +51,7 @@ parser.add_argument(
 parser.add_argument(
     "--project-dir",
     "-d",
-    default=CDW,
+    default=None,
     type=dir_type,
     help="The project directory. (default: current directory)",
 )
@@ -85,18 +72,30 @@ parser.add_argument(
 parser.add_argument(
     "settings",
     nargs="*",
-    action=SettingsAction,
     help="The settings classes or objects to export.",
+)
+parser.add_argument(
+    "--env-file",
+    "-e",
+    default=None,
+    type=argparse.FileType("r"),
+    help="Use the .env file to load environment variables. (default: None)",
 )
 
 
 def main(parse_args: Sequence[str] | None = None):  # noqa: D103
-    args = parser.parse_args(parse_args)
+    args: argparse.Namespace = parser.parse_args(parse_args)
+    if args.env_file:
+        print(args.env_file)
+        os.environ.update(dotenv_values(stream=args.env_file))
     s = Settings.from_pyproject(args.config_file)
 
-    s.project_dir = args.project_dir
+    if args.project_dir:
+        s.project_dir = Path(args.project_dir).resolve().absolute()
+    sys.path.insert(0, str(s.project_dir))
+
     s.generators = args.generator
-    settings = s.default_settings or args.settings
+    settings = s.settings or [import_settings_from_string(s) for s in args.settings]
     if not settings:
         parser.exit(0, parser.format_help())
 

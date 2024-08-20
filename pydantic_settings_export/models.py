@@ -1,7 +1,8 @@
+import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import Self
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -11,11 +12,17 @@ from pydantic_settings import BaseSettings
 from pydantic_settings_export.constants import FIELD_TYPE_MAP
 from pydantic_settings_export.settings import Settings
 
-
 __all__ = (
     "FieldInfoModel",
     "SettingsInfoModel",
 )
+
+
+def _prepare_example(example: Any) -> str:
+    """Prepare the example for the field."""
+    if isinstance(example, set):
+        example = sorted(example)
+    return str(example)
 
 
 class FieldInfoModel(BaseModel):
@@ -41,11 +48,11 @@ class FieldInfoModel(BaseModel):
 
     @staticmethod
     def create_default(field: FieldInfo, global_settings: Settings | None = None) -> str | None:
-        """Make default value for the field.
+        """Make the default value for the field.
 
-        :param field: The field info to generate default value for.
+        :param field: The field info to generate the default value for.
         :param global_settings: The global settings.
-        :return: The default value for the field as string, or None if there is no default value.
+        :return: The default value for the field as a string, or None if there is no default value.
         """
         default: object | PydanticUndefined = field.default
 
@@ -60,13 +67,20 @@ class FieldInfoModel(BaseModel):
             and isinstance(default, Path)
             and default.is_absolute()
         ):
-            # Make the default path relative to the global_settings
-            default = Path(global_settings.relative_to.alias) / default.relative_to(global_settings.project_dir)
+            try:
+                # Make the default path relative to the global_settings
+                default = Path(global_settings.relative_to.alias) / default.relative_to(
+                    global_settings.project_dir.resolve().absolute()
+                )
+            except ValueError:
+                pass
 
         if default is PydanticUndefined:
             return None
         try:
-            return TypeAdapter(field.annotation).dump_json(default).decode()
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                return TypeAdapter(field.annotation).dump_json(default).decode()
         except PydanticSerializationError:
             return str(default)
 
@@ -100,7 +114,7 @@ class FieldInfoModel(BaseModel):
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
-        example: str | None = str(field.examples[0]) if field.examples else default
+        example: str | None = _prepare_example(field.examples[0]) if field.examples else default
 
         return cls(
             name=name,
