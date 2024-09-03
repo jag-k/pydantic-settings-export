@@ -1,6 +1,7 @@
 # pydantic-settings-export
 
 [![PyPI version](https://img.shields.io/pypi/v/pydantic-settings-export?logo=pypi&label=pydantic-settings-export)](https://pypi.org/project/pydantic-settings-export/)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/pydantic-settings-export)
 
 *Export your Pydantic settings to a Markdown and .env.example files!*
 
