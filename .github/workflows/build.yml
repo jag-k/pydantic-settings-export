@@ -14,24 +14,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install poetry
-        run: pipx install poetry
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
 
-      - name: Install Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'poetry'
+          python-version-file: "pyproject.toml"
 
-      - name: Install dependencies
-        run: poetry install
+      - name: Install the project
+        run: uv sync --all-extras --dev
 
       - name: Run linting
-        run: poetry run pre-commit run --all-files
+        run: uv run pre-commit run --all-files
 
       - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/')
         env:
-          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
           poetry self add "poetry-dynamic-versioning[plugin]" --no-interaction
           poetry config pypi-token.pypi $PYPI_TOKEN
@@ -41,10 +41,11 @@ jobs:
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
           echo "PACKAGE_VERSION=$PACKAGE_VERSION" >> "$GITHUB_ENV"
 
-          poetry publish --build --no-interaction && echo "published=1" >> "$GITHUB_ENV" || echo "published=0" >> "$GITHUB_ENV"
+          uv publish && echo "published=1" >> "$GITHUB_ENV" || echo "published=0" >> "$GITHUB_ENV"
 
 
       - name: Check if published
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           if [ "$published" = "1" ]; then
             echo "Published to PyPI"

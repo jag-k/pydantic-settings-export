@@ -1,8 +1,12 @@
-[tool.poetry]
+[project]
 name = "pydantic-settings-export"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Export your Pydantic settings to a Markdown and .env.example files!"
-authors = ["Jag_k <30597878+jag-k@users.noreply.github.com>"]
+readme = "README.md"
+authors = [
+    { name = "Jag_k", email = "30597878+jag-k@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
@@ -15,52 +19,37 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-
 ]
-readme = "README.md"
-license = "MIT"
+license = {file = "LICENCE"}
 repository = "https://github.com/jag-k/pydantic-settings-export"
 homepage = "https://github.com/jag-k/pydantic-settings-export#readme"
 packages = [
     { include = "pydantic_settings_export", from = "." },
 ]
+keywords = ["pydantic", "settings", "export", "markdown", "dotenv", "config"]
 
-[tool.poetry.scripts]
+[project.urls]
+"Homepage" = "https://github.com/jag-k/pydantic-settings-export"
+"Bug Tracker" = "https://github.com/jag-k/pydantic-settings-export/issues"
+"Documentation" = "https://github.com/jag-k/pydantic-settings-export#readme"
+
+[project.scripts]
 pydantic-settings-export = "pydantic_settings_export.cli:main"
 
-[tool.poetry.dependencies]
-python = "^3.11"
-pydantic = "^2"
-pydantic-settings = "^2"
-
-
-[tool.poetry.group.dev.dependencies]
-ruff = "*"
-ruff-lsp = "*"
-pre-commit = "*"
-ssort = "*"
-
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-style = "semver"
-
-[tool.poetry-dynamic-versioning.substitution]
-files = [
-    "pydantic_settings_export/version.py",
+[tool.uv]
+dev-dependencies = [
+    "mypy>=1.12.1",
+    "pre-commit>=4.0.1",
+    "ruff>=0.7.0",
+    "ssort>=0.13.0",
 ]
 
-[tool.poetry-dynamic-versioning.files."pydantic_settings_export/version.py"]
-persistent-substitution = true
-initial-content = """
-# These version placeholders will be replaced later during substitution.
-__version__ = "0.0.0"
-__version_tuple__ = (0, 0, 0)
-"""
+[tool.hatch.version]
+path = "pydantic_settings_export/version.py"
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 
 # https://docs.astral.sh/ruff/
@@ -136,7 +125,7 @@ project_dir = "."
 default_settings = [
     "pydantic_settings_export.settings:Settings",
 ]
-dotenv = {"name" = ".env.example"}
+dotenv = { "name" = ".env.example" }
 env_file = ".env"
 
 
