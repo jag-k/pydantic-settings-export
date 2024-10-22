@@ -27,6 +27,10 @@ packages = [
     { include = "pydantic_settings_export", from = "." },
 ]
 keywords = ["pydantic", "settings", "export", "markdown", "dotenv", "config"]
+dependencies = [
+    "pydantic-settings>=2",
+    "pydantic>=2",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/jag-k/pydantic-settings-export"
