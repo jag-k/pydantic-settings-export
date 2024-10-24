@@ -5,10 +5,10 @@ from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic_settings.sources import PydanticBaseSettingsSource, PyprojectTomlConfigSettingsSource
 
-__all__ = ("SourcesMixin",)
+__all__ = ("TomlSettings",)
 
 
-class SourcesMixin:
+class TomlSettings(BaseSettings):
     """The sources mixin."""
 
     @classmethod
