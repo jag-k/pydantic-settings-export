@@ -2,14 +2,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
-from pydantic import Field, ImportString, TypeAdapter, model_validator
+from pydantic import Field, ImportString, SkipValidation, TypeAdapter, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export.constants import StrAsPath
 from pydantic_settings_export.sources import SourcesMixin
 
 if TYPE_CHECKING:
-    from pydantic_settings_export.generators.abstract import AbstractGenerator  # noqa: F401
+    from pydantic_settings_export.generators.abstract import AbstractGenerator
 
 __all__ = (
     "MarkdownSettings",
@@ -112,7 +112,7 @@ class Settings(BaseSettings, SourcesMixin):
         description="Respect the exclude attribute in the fields.",
     )
 
-    generators: list[type["AbstractGenerator"]] = Field(
+    generators: list[SkipValidation[type["AbstractGenerator"]]] = Field(
         default_factory=list,
         description="The list of generators to use.",
         exclude=True,
