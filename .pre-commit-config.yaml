@@ -1,12 +1,12 @@
 # https://pre-commit.com/
 
-default_stages: [ commit, push ]
+default_stages: [ pre-commit, pre-push ]
 default_language_version:
-  python: python3.11
+  python: python3.12
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: check-ast
         always_run: true
@@ -54,15 +54,10 @@ repos:
         entry: ssort
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.1
+    rev: v0.7.0
     hooks:
       # Run the linter.
       - id: ruff
         args: [ --fix ]
       # Run the formatter.
       - id: ruff-format
-
-  - repo: https://github.com/floatingpurr/sync_with_poetry
-    rev: 1.1.0
-    hooks:
-      - id: sync_with_poetry

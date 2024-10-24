@@ -86,9 +86,11 @@ parser.add_argument(
 def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     args: argparse.Namespace = parser.parse_args(parse_args)
     if args.env_file:
-        print(args.env_file)
         os.environ.update(dotenv_values(stream=args.env_file))
-    s = Settings.from_pyproject(args.config_file)
+
+    if args.config_file and Path(args.config_file).is_file():
+        Settings.model_config["toml_file"] = args.config_file
+    s = Settings()
 
     if args.project_dir:
         s.project_dir = Path(args.project_dir).resolve().absolute()
