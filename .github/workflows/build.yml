@@ -33,6 +33,7 @@ jobs:
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
+          uv build
           uv publish && echo "published=1" >> "$GITHUB_ENV" || echo "published=0" >> "$GITHUB_ENV"
 
 
