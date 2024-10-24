@@ -152,3 +152,6 @@ git_repos/
 !tests/data/documents/
 mongo/
 !data/**/*
+
+# Hatch version control from https://github.com/ofek/hatch-vcs
+pydantic_settings_export/version.py
