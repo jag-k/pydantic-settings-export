@@ -107,7 +107,7 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     s.generators = args.generator
     settings = s.settings or [import_settings_from_string(s) for s in args.settings]
     if not settings:
-        parser.exit(0, parser.format_help())
+        parser.exit(1, parser.format_help())
 
     result = Exporter(s).run_all(*settings)
     if result:

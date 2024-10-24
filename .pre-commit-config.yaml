@@ -27,10 +27,6 @@ repos:
       - id: check-xml
         always_run: true
 
-      - id: fix-encoding-pragma
-        always_run: true
-        args: [ --remove ]
-
       - id: end-of-file-fixer
         always_run: true
 
@@ -61,3 +57,12 @@ repos:
         args: [ --fix ]
       # Run the formatter.
       - id: ruff-format
+
+  - repo: local
+    hooks:
+    -   id: pydantic-settings-export
+        name: pydantic-settings-export
+        entry: pydantic-settings-export
+        language: python
+        files: \.py$
+        pass_filenames: false
