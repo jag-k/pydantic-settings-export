@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 from pydantic import Field, ImportString, TypeAdapter, model_validator
@@ -7,7 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export.constants import StrAsPath
 from pydantic_settings_export.sources import SourcesMixin
-from pydantic_settings_export.utils import get_config_from_pyproject_toml
 
 if TYPE_CHECKING:
     from pydantic_settings_export.generators.abstract import AbstractGenerator  # noqa: F401
@@ -77,11 +76,7 @@ class Settings(BaseSettings, SourcesMixin):
     model_config = SettingsConfigDict(
         title="Global Settings",
         env_prefix="PYDANTIC_SETTINGS_EXPORT_",
-        plugin_settings={
-            "pyproject_toml": {
-                "package_name": "pydantic_settings_export",
-            }
-        },
+        pyproject_toml_table_header=("tool", "pydantic_settings_export"),
     )
 
     default_settings: list[str] = Field(
@@ -117,7 +112,7 @@ class Settings(BaseSettings, SourcesMixin):
         description="Respect the exclude attribute in the fields.",
     )
 
-    generators: list = Field(  # type: list[type[AbstractGenerator]]
+    generators: list[type["AbstractGenerator"]] = Field(
         default_factory=list,
         description="The list of generators to use.",
         exclude=True,
@@ -149,15 +144,3 @@ class Settings(BaseSettings, SourcesMixin):
                     print("Loading env file", f)
                     load_dotenv(file)
         return data
-
-    @classmethod
-    def from_pyproject(cls, base_path: Path | None = None) -> Self:
-        """Load settings from the pyproject.toml file.
-
-        :param base_path: The base path to search for the pyproject.toml file or this file itself.
-        The current working directory is used by default.
-        :return: The loaded settings.
-        """
-        config = get_config_from_pyproject_toml(cls, base_path)
-        config.setdefault("project_dir", str(base_path.parent))
-        return cls(**config)

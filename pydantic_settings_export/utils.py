@@ -1,17 +1,13 @@
 import argparse
 import importlib
 import sys
-import tomllib
-from pathlib import Path
+from collections.abc import Sequence
 from typing import Any
 
 __all__ = (
-    "find_pyproject_toml",
     "make_pretty_md_table",
     "make_pretty_md_table_from_dict",
 )
-
-from pydantic_settings import BaseSettings
 
 
 def make_pretty_md_table(header: list[str], rows: list[list[str]]) -> str:  # noqa: C901
@@ -62,58 +58,6 @@ def make_pretty_md_table_from_dict(data: list[dict[str, str | None]]) -> str:
     return make_pretty_md_table(header, rows)
 
 
-def find_pyproject_toml(search_from: Path | None = None) -> Path | None:
-    """Find the pyproject.toml file in the current working directory or its parents.
-
-    :param search_from: The directory to start searching from.
-    :return: The path to the pyproject.toml file or None if it wasn't found.
-    """
-    if not search_from:
-        search_from = Path.cwd()
-    for parent in (search_from, *search_from.parents):
-        pyproject_toml = parent / "pyproject.toml"
-        if pyproject_toml.is_file():
-            return pyproject_toml
-    return None
-
-
-def get_tool_name(settings: type[BaseSettings]) -> str | None:
-    """Get the tool name from the settings.
-
-    :param settings: The settings class to get the tool name from.
-    :return: The tool name.
-    """
-    return settings.model_config.get("plugin_settings", {}).get("pyproject_toml", {}).get("package_name", None)
-
-
-def get_config_from_pyproject_toml(settings: type[BaseSettings], base_path: Path | None = None) -> dict:
-    """Get the configuration from the pyproject.toml file.
-
-    :param base_path: The base path to search for the pyproject.toml file or this file itself.
-        The current working directory is used by default.
-    :param settings: The settings class to create the settings from.
-    :return: The created settings.
-    """
-    tool_name = get_tool_name(settings)
-
-    if not tool_name:
-        raise ValueError("The tool name is not set in the settings.")
-
-    if not base_path:
-        base_path = Path.cwd()
-
-    if not base_path.is_file():
-        base_path = find_pyproject_toml(base_path)
-
-    if not base_path:
-        raise FileNotFoundError("The pyproject.toml file was not found.")
-
-    with open(base_path, "rb") as file:
-        data = tomllib.load(file)
-
-    return data.get("tool", {}).get(tool_name, {})
-
-
 class ObjectImportAction(argparse.Action):
     """Import the object from the module."""
 
@@ -148,10 +92,13 @@ class ObjectImportAction(argparse.Action):
         self,
         parser: argparse.ArgumentParser,
         namespace: argparse.Namespace,
-        values: list[str],
+        values: str | Sequence[Any] | None,
         option_string: str | None = None,
     ) -> None:
         """Import the object from the module."""
+        if values is None:
+            return
+
         # Add the project directory to the sys.path
         sys.path.insert(0, str(namespace.project_dir))
         importlib.invalidate_caches()
@@ -166,6 +113,8 @@ class ObjectImportAction(argparse.Action):
             result = []
 
         for value in values:
+            if not isinstance(value, str):
+                continue
             try:
                 result.append(self.callback(self.import_obj(value)))
             except (ValueError, ModuleNotFoundError) as e:

@@ -219,6 +219,7 @@ dev = [
     { name = "pre-commit" },
     { name = "ruff" },
     { name = "ssort" },
+    { name = "types-pyyaml" },
 ]
 
 [package.metadata]
@@ -233,6 +234,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.0.1" },
     { name = "ruff", specifier = ">=0.7.0" },
     { name = "ssort", specifier = ">=0.13.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12.20240917" },
 ]
 
 [[package]]
@@ -314,6 +316,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/24/71/8dc4671b53999c0629506e89e12fb3af4acfb603edb69f1d3a47ae5c78f2/ssort-0.13.0.tar.gz", hash = "sha256:a7b35e7725fa93bc6bd82839eb70083cf31bd58545357534288d988a4af8ec4d", size = 22519 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3d/d5/86fdced8dd31cb10f96d3b694aaccb71bc964b1b1ced898ec9a0a7602f11/ssort-0.13.0-py3-none-any.whl", hash = "sha256:bb33a64403c3769aec9f5d63f086e4355b6fc1dc62b91e1af6117781fb0b6810", size = 26735 },
+]
+
+[[package]]
+name = "types-pyyaml"
+version = "6.0.12.20240917"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/7d/a95df0a11f95c8f48d7683f03e4aed1a2c0fc73e9de15cca4d38034bea1a/types-PyYAML-6.0.12.20240917.tar.gz", hash = "sha256:d1405a86f9576682234ef83bcb4e6fff7c9305c8b1fbad5e0bcd4f7dbdc9c587", size = 12381 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9e/2c/c1d81d680997d24b0542aa336f0a65bd7835e5224b7670f33a7d617da379/types_PyYAML-6.0.12.20240917-py3-none-any.whl", hash = "sha256:392b267f1c0fe6022952462bf5d6523f31e37f6cea49b14cee7ad634b6301570", size = 15264 },
 ]
 
 [[package]]
