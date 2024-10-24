@@ -36,13 +36,12 @@ class AbstractGenerator(ABC):
         return "\n\n".join(self.generate_single(s).strip() for s in settings_infos).strip() + "\n"
 
     @abstractmethod
-    def write_to_files(self, generated_result: str) -> list[Path]:
-        """Write the generated content to files.
+    def file_paths(self) -> list[Path]:
+        """Get the list of files, which need to create/update.
 
-        :param generated_result: The result is to write to files.
-        :return: The list of file paths is written to.
+        :return: The list of files to write.
+        This is used to determine if the files need to be written.
         """
-        raise NotImplementedError
 
     @classmethod
     def run(cls, settings: Settings, settings_info: SettingsInfoModel) -> list[Path]:
@@ -54,4 +53,13 @@ class AbstractGenerator(ABC):
         """
         generator = cls(settings)
         result = generator.generate(settings_info)
-        return [path.resolve().absolute() for path in generator.write_to_files(result)]
+        file_paths = generator.file_paths()
+        updated_files: list[Path] = []
+        for path in file_paths:
+            if path.is_file() and path.read_text() == result:
+                # No need to update the file
+                continue
+
+            path.write_text(result)
+            updated_files.append(path)
+        return updated_files

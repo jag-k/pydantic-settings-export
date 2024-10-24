@@ -70,11 +70,11 @@ class MarkdownGenerator(AbstractGenerator):
             + "\n\n".join(self.generate_single(s, 2).strip() for s in settings_infos)
         ).strip() + "\n"
 
-    def write_to_files(self, generated_result: str) -> list[Path]:
-        """Write the generated content to files.
+    def file_paths(self) -> list[Path]:
+        """Get the list of files, which need to create/update.
 
-        :param generated_result: The result to write to files.
-        :return: The list of file paths written to.
+        :return: The list of files to write.
+        This is used to determine if the files need to be written.
         """
         file_paths = []
         for d in self.settings.markdown.save_dirs:
@@ -82,5 +82,4 @@ class MarkdownGenerator(AbstractGenerator):
             d.mkdir(parents=True, exist_ok=True)
             p = d / self.settings.markdown.name
             file_paths.append(p)
-            p.write_text(generated_result)
         return file_paths

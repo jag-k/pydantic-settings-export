@@ -10,15 +10,13 @@ __all__ = ("DotEnvGenerator",)
 class DotEnvGenerator(AbstractGenerator):
     """The .env example generator."""
 
-    def write_to_files(self, generated_result: str) -> list[Path]:
-        """Write the generated content to files.
+    def file_paths(self) -> list[Path]:
+        """Get the list of files, which need to create/update.
 
-        :param generated_result: The result is to write to files.
-        :return: The list of file paths is written to.
+        :return: The list of files to write.
+        This is used to determine if the files need to be written.
         """
-        file_path = self.settings.root_dir / self.settings.dotenv.name
-        file_path.write_text(generated_result)
-        return [file_path]
+        return [self.settings.root_dir / self.settings.dotenv.name]
 
     def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
         """Generate a .env example for a pydantic settings class.
