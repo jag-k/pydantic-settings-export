@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pydantic-settings-export?logo=pypi&label=pydantic-settings-export)](https://pypi.org/project/pydantic-settings-export/)
 ![Pepy Total Downloads](https://img.shields.io/pepy/dt/pydantic-settings-export)
 
-*Export your Pydantic settings to a Markdown and .env.example files!*
+*Export your Pydantic settings to Markdown and .env.example files!*
 
 This package provides a way to use [pydantic](https://docs.pydantic.dev/) (and [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)) models to generate a Markdown file with the settings and their descriptions, and a `.env.example` file with the settings and their default values.
 
@@ -13,11 +13,13 @@ This package provides a way to use [pydantic](https://docs.pydantic.dev/) (and [
 pip install pydantic-settings-export
 # or
 pipx install pydantic-settings-export  # for a global installation and using as a CLI
+# or
+uv tool install pydantic-settings-export
 ```
 
 ## Usage
 
-You can see the examples of usage this package in the [./docs/Configuration.md](./docs/Configuration.md) and [.env.example](./.env.example).
+You can see the usage examples of this package in the [./docs/Configuration.md](https://github.com/jag-k/pydantic-settings-export/blob/main/docs/Configuration.md) and [.env.example](https://github.com/jag-k/pydantic-settings-export/blob/main/.env.example).
 
 ### As code
 
@@ -80,4 +82,4 @@ save_dirs = [
 
 ## License
 
-[MIT](./LICENCE)
+[MIT](https://github.com/jag-k/pydantic-settings-export/blob/main/LICENCE)

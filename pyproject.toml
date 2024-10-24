@@ -49,13 +49,15 @@ dev-dependencies = [
     "types-pyyaml>=6.0.12.20240917",
 ]
 
-[tool.hatch.version]
-path = "pydantic_settings_export/version.py"
-
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "pydantic_settings_export/version.py"
 
 # https://docs.astral.sh/ruff/
 [tool.ruff]
