@@ -38,6 +38,14 @@ def dir_type(path: str) -> Path:
     raise argparse.ArgumentTypeError(f"The {path} is not a directory.")
 
 
+def file_type(path: str) -> Path:
+    """Check if the path is a file."""
+    p = Path(path).resolve().absolute()
+    if p.is_file():
+        return p
+    raise argparse.ArgumentTypeError(f"The {path} is not a file.")
+
+
 parser = argparse.ArgumentParser(
     description="Export pydantic settings to a file",
 )
@@ -59,7 +67,7 @@ parser.add_argument(
     "--config-file",
     "-c",
     default=CDW / "pyproject.toml",
-    type=argparse.FileType("rb"),
+    type=file_type,
     help="Path to `pyproject.toml` file. (default: ./pyproject.toml)",
 )
 parser.add_argument(
@@ -88,7 +96,7 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     if args.env_file:
         os.environ.update(dotenv_values(stream=args.env_file))
 
-    if args.config_file and Path(args.config_file).is_file():
+    if args.config_file:
         Settings.model_config["toml_file"] = args.config_file
     s = Settings()
 

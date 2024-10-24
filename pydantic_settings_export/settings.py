@@ -6,7 +6,7 @@ from pydantic import Field, ImportString, SkipValidation, TypeAdapter, model_val
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export.constants import StrAsPath
-from pydantic_settings_export.sources import SourcesMixin
+from pydantic_settings_export.sources import TomlSettings
 
 if TYPE_CHECKING:
     from pydantic_settings_export.generators.abstract import AbstractGenerator
@@ -70,7 +70,7 @@ class DotEnvSettings(BaseSettings):
     name: str = Field(".env.example", description="The name of the .env file.")
 
 
-class Settings(BaseSettings, SourcesMixin):
+class Settings(TomlSettings):
     """Global settings for pydantic_settings_export."""
 
     model_config = SettingsConfigDict(
