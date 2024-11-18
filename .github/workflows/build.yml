@@ -37,7 +37,6 @@ jobs:
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          git diff
           uv build
           uv publish
 
