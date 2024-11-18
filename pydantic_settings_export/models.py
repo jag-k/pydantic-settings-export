@@ -125,7 +125,7 @@ class FieldInfoModel(BaseModel):
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
-        example: str | None = _prepare_example(field.examples[0]) if field.examples else default
+        example: str | None = _prepare_example(field.examples[0] if field.examples else default)
         # Get the deprecated status from the field if it exists
         deprecated: bool = field.deprecated or False
 
