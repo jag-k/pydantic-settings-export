@@ -63,6 +63,9 @@ class FieldInfoModel(BaseModel):
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
 
+        if isinstance(default, set):
+            default = sorted(default)
+
         # Validate Path values
         if (
             # if we need to replace absolute paths
