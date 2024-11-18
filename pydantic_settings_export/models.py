@@ -18,6 +18,9 @@ __all__ = (
 )
 
 
+BASE_SETTINGS_DOCS = getdoc(BaseSettings)
+
+
 def _prepare_example(example: Any) -> str:
     """Prepare the example for the field."""
     if isinstance(example, set):
@@ -34,17 +37,18 @@ class FieldInfoModel(BaseModel):
     type: str = Field(..., description="The type of the field.")
     default: str | None = Field(
         None,
-        description="The default value of the field.",
+        description="The default value of the field as a string.",
         validate_default=False,
     )
     description: str | None = Field(None, description="The description of the field.")
     example: str | None = Field(None, description="The example of the field.")
     alias: str | None = Field(None, description="The alias of the field.")
+    deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
 
     @property
     def is_required(self) -> bool:
         """Check if the field is required."""
-        return self.default is PydanticUndefined
+        return self.default is None
 
     @staticmethod
     def create_default(field: FieldInfo, global_settings: Settings | None = None) -> str | None:
@@ -59,6 +63,7 @@ class FieldInfoModel(BaseModel):
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
 
+        # Validate Path values
         if (
             # if we need to replace absolute paths
             global_settings
@@ -67,16 +72,22 @@ class FieldInfoModel(BaseModel):
             and isinstance(default, Path)
             and default.is_absolute()
         ):
-            try:
-                # Make the default path relative to the global_settings
+            project_dir = global_settings.project_dir.resolve().absolute()
+            home_dir = Path.home().resolve().absolute()
+
+            # Make the default path relative to the global_settings
+            if default.is_relative_to(project_dir):
                 default = Path(global_settings.relative_to.alias) / default.relative_to(
                     global_settings.project_dir.resolve().absolute()
                 )
-            except ValueError:
-                pass
+
+            # Make the default path relative to the user's home directory
+            elif default.is_relative_to(home_dir):
+                default = "~" / default.relative_to(home_dir)
 
         if default is PydanticUndefined:
             return None
+
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
@@ -115,6 +126,8 @@ class FieldInfoModel(BaseModel):
         description: str | None = field.description or None
         # Get the example from the field if it exists
         example: str | None = _prepare_example(field.examples[0]) if field.examples else default
+        # Get the deprecated status from the field if it exists
+        deprecated: bool = field.deprecated or False
 
         return cls(
             name=name,
@@ -123,6 +136,7 @@ class FieldInfoModel(BaseModel):
             description=description,
             example=example,
             alias=field.alias,
+            deprecated=deprecated,
         )
 
 
@@ -163,6 +177,15 @@ class SettingsInfoModel(BaseModel):
                 continue
             fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings))
 
+        docs = getdoc(settings) or ""
+
+        # If the docs are the same as the base settings docs, then remove them
+        if BASE_SETTINGS_DOCS and (docs.strip() == BASE_SETTINGS_DOCS.strip()):
+            docs = ""
+
+        # Remove all text after the first form feed character
+        docs = docs.split("\f", 1)[0].strip()
+
         return cls(
             name=(
                 # Get the title from the settings model if it exists
@@ -172,7 +195,7 @@ class SettingsInfoModel(BaseModel):
                 # Otherwise, get the class name from the settings model
                 or str(settings.__class__.__name__)
             ),
-            docs=(getdoc(settings) or "").strip(),
+            docs=docs.strip(),
             env_prefix=conf.get("env_prefix", ""),
             fields=fields,
             child_settings=child_settings,

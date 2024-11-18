@@ -30,10 +30,8 @@ class DotEnvGenerator(AbstractGenerator):
             field_name = f"{settings_info.env_prefix}{field.name.upper()}"
             if field.alias:
                 field_name = field.alias.upper()
-            field_string = f"{field_name}={field.default}\n"
 
-            if not field.is_required:
-                field_string = f"# {field_string}"
+            field_string = f"{field_name}=\n" if field.is_required else f"# {field_name}={field.default}\n"
             result += field_string
 
         result = result.strip() + "\n\n"
