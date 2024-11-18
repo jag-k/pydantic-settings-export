@@ -37,7 +37,7 @@ class AbstractGenerator(ABC):
 
     @abstractmethod
     def file_paths(self) -> list[Path]:
-        """Get the list of files, which need to create/update.
+        """Get the list of files which need to create/update.
 
         :return: The list of files to write.
         This is used to determine if the files need to be written.

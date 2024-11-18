@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import TypedDict
 
-from pydantic_settings_export.models import SettingsInfoModel
+from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict
 
 from .abstract import AbstractGenerator
@@ -17,6 +17,37 @@ class TableRowDict(TypedDict):
     Default: str
     Description: str
     Example: str | None
+
+
+def q(s: str) -> str:
+    """Add quotes around the string."""
+    return f"`{s}`"
+
+
+def _make_table_row(settings_info: SettingsInfoModel, field: FieldInfoModel) -> TableRowDict:
+    """Make a table row dictionary from a field."""
+    name = f"`{settings_info.env_prefix}{field.name.upper()}`"
+    if field.alias:
+        name = q(field.alias.upper())
+
+    if field.deprecated:
+        name += " (⚠️ Deprecated)"
+
+    default = "*required*"
+    if not field.is_required:
+        default = q(field.default)
+
+    example: str | None = None
+    if field.example:
+        example = q(field.example)
+
+    return TableRowDict(
+        Name=name,
+        Type=q(field.type),
+        Default=default,
+        Description=field.description,
+        Example=example,
+    )
 
 
 class MarkdownGenerator(AbstractGenerator):
@@ -39,16 +70,7 @@ class MarkdownGenerator(AbstractGenerator):
             result += f"**Environment Prefix**: `{settings_info.env_prefix}`\n\n"
 
         # Generate fields
-        rows: list[TableRowDict] = [
-            TableRowDict(
-                Name=f"`{field.alias.upper()}`" if field.alias else f"`{settings_info.env_prefix}{field.name.upper()}`",
-                Type=f"`{field.type}`",
-                Default=f"`{field.default}`" if not field.is_required else "*required*",
-                Description=field.description,
-                Example=f"`{field.example}`" if field.example else None,
-            )
-            for field in settings_info.fields
-        ]
+        rows: list[TableRowDict] = [_make_table_row(settings_info, field) for field in settings_info.fields]
 
         if rows:
             result += make_pretty_md_table_from_dict(rows) + "\n\n"
