@@ -144,3 +144,6 @@ class Settings(TomlSettings):
                     print("Loading env file", f)
                     load_dotenv(file)
         return data
+
+
+Settings.model_rebuild()
