@@ -1,8 +1,16 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
+from typing import TYPE_CHECKING, TypeAlias
 
-from pydantic_settings_export.models import SettingsInfoModel
-from pydantic_settings_export.settings import Settings
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from pydantic_settings_export.models import SettingsInfoModel
+    from pydantic_settings_export.settings import Settings
+
+else:
+    SettingsInfoModel: TypeAlias = BaseModel
+    Settings: TypeAlias = BaseModel
 
 __all__ = ("AbstractGenerator",)
 
