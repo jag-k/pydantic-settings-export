@@ -25,7 +25,9 @@ You can see the usage examples of this package in the [./docs/Configuration.md](
 
 ```python
 from pydantic import BaseSettings
-from pydantic_settings_export import Exporter, MarkdownSettings, Settings as PSESettings
+
+from pydantic_settings_export import Exporter, Generators, PSESettings
+from pydantic_settings_export.generators import MarkdownGenerator
 
 
 class Settings(BaseSettings):
@@ -36,9 +38,25 @@ class Settings(BaseSettings):
 # Export the settings to a Markdown file `docs/Configuration.md` and `.env.example` file
 Exporter(
   PSESettings(
-    markdown=MarkdownSettings(
-      save_dirs=["docs"],
-    ),
+    generators=Generators(
+      markdown=MarkdownGenerator.config(
+        save_dirs=["docs"],
+      ),
+    )
+  ),
+).run_all(Settings)
+
+# OR
+
+Exporter(
+  PSESettings.model_validate(
+    {
+      "generators": {
+        "markdown": {
+          "save_dirs": ["docs"],
+        },
+      },
+    },
   ),
 ).run_all(Settings)
 ```
@@ -60,10 +78,12 @@ project_dir = "."
 default_settings = [
   "pydantic_settings_export.settings:Settings",
 ]
-dotenv = { "name" = ".env.example" }
 
-[tool.pydantic_settings_export.markdown]
-name = "Configuration.md"
+[tool.pydantic_settings_export.generators.dotenv]
+path = ".env.example"
+
+[tool.pydantic_settings_export.generators.markdown]
+path = "Configuration.md"
 save_dirs = [
   "docs",
   "wiki",

@@ -3,14 +3,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias, TypeVar, final
 
 from pydantic import BaseModel, Field, create_model
+from pydantic_settings import BaseSettings
 
 if TYPE_CHECKING:
     from pydantic_settings_export.models import SettingsInfoModel
-    from pydantic_settings_export.settings import Settings
+    from pydantic_settings_export.settings import PSESettings
 
 else:
     SettingsInfoModel: TypeAlias = BaseModel
-    Settings: TypeAlias = BaseModel
+    PSESettings: TypeAlias = BaseSettings
+
 
 __all__ = ("AbstractGenerator",)
 
@@ -25,7 +27,7 @@ class AbstractGenerator(ABC):
 
     ALL_GENERATORS: ClassVar[list[type["AbstractGenerator"]]] = []
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: PSESettings) -> None:
         """Initialize the AbstractGenerator.
 
         :param settings: The settings for the generator.
@@ -73,7 +75,7 @@ class AbstractGenerator(ABC):
         raise NotImplementedError
 
     @classmethod
-    def run(cls, settings: Settings, *settings_info: SettingsInfoModel) -> list[Path]:
+    def run(cls, settings: PSESettings, *settings_info: SettingsInfoModel) -> list[Path]:
         """Run the generator.
 
         :param settings: The settings for the generator.

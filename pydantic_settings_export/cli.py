@@ -10,7 +10,7 @@ from dotenv import dotenv_values
 
 from pydantic_settings_export.exporter import Exporter
 from pydantic_settings_export.generators import AbstractGenerator
-from pydantic_settings_export.settings import Settings
+from pydantic_settings_export.settings import PSESettings
 from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
 from pydantic_settings_export.version import __version__
 
@@ -101,8 +101,8 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
         os.environ.update(dotenv_values(stream=args.env_file))
 
     if args.config_file:
-        Settings.model_config["toml_file"] = args.config_file
-    s = Settings()
+        PSESettings.model_config["toml_file"] = args.config_file
+    s = PSESettings()
 
     if args.project_dir:
         s.project_dir = Path(args.project_dir).resolve().absolute()

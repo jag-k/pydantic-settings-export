@@ -11,7 +11,7 @@ from pydantic_settings_export.utils import import_settings_from_string
 
 __all__ = (
     "RelativeToSettings",
-    "Settings",
+    "PSESettings",
 )
 
 
@@ -24,7 +24,7 @@ class RelativeToSettings(BaseModel):
     alias: str = Field("<project_dir>", description="The alias for the relative directory.")
 
 
-class Settings(TomlSettings):
+class PSESettings(TomlSettings):
     """Global settings for pydantic_settings_export."""
 
     model_config = SettingsConfigDict(

@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.generators import AbstractGenerator
 from pydantic_settings_export.models import SettingsInfoModel
-from pydantic_settings_export.settings import Settings
+from pydantic_settings_export.settings import PSESettings
 
 __all__ = ("Exporter",)
 
@@ -14,10 +14,10 @@ class Exporter:
 
     def __init__(
         self,
-        settings: Settings | None = None,
+        settings: PSESettings | None = None,
         generators: list[type[AbstractGenerator]] | None = None,
     ) -> None:
-        self.settings: Settings = settings or Settings()
+        self.settings: PSESettings = settings or PSESettings()
         self.generators: list[type[AbstractGenerator]] = settings.generators_list if generators is None else generators
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:

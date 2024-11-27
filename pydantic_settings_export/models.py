@@ -12,9 +12,9 @@ from pydantic_settings import BaseSettings
 from pydantic_settings_export.constants import FIELD_TYPE_MAP
 
 if TYPE_CHECKING:
-    from pydantic_settings_export.settings import Settings
+    from pydantic_settings_export.settings import PSESettings
 else:
-    Settings = BaseSettings
+    PSESettings = BaseSettings
 
 __all__ = (
     "FieldInfoModel",
@@ -48,7 +48,7 @@ def _prepare_example(example: Any, value_type: type | None = None) -> str:
 P = TypeVar("P", bound=Path)
 
 
-def default_path(default: P, global_settings: Settings | None = None) -> P:
+def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     # Check if default is a Path and is absolute
     if default.is_absolute():
         # if we need to replace absolute paths
@@ -88,7 +88,7 @@ class FieldInfoModel(BaseModel):
         return self.default is None
 
     @staticmethod
-    def create_default(field: FieldInfo, global_settings: Settings | None = None) -> str | None:
+    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
         """Make the default value for the field.
 
         :param field: The field info to generate the default value for.
@@ -117,7 +117,7 @@ class FieldInfoModel(BaseModel):
         cls,
         name: str,
         field: FieldInfo,
-        global_settings: Settings | None = None,
+        global_settings: PSESettings | None = None,
     ) -> Self:
         """Generate FieldInfoModel using name and field.
 
@@ -174,7 +174,7 @@ class SettingsInfoModel(BaseModel):
     def from_settings_model(
         cls,
         settings: BaseSettings | type[BaseSettings],
-        global_settings: Settings | None = None,
+        global_settings: PSESettings | None = None,
         prefix: str = "",
         nested_delimiter: str = "_",
     ) -> Self:
