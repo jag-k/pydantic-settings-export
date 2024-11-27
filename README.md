@@ -80,10 +80,10 @@ default_settings = [
 ]
 
 [tool.pydantic_settings_export.generators.dotenv]
-path = ".env.example"
+name = ".env.example"
 
 [tool.pydantic_settings_export.generators.markdown]
-path = "Configuration.md"
+name = "Configuration.md"
 save_dirs = [
   "docs",
   "wiki",
