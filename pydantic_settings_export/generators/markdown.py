@@ -38,8 +38,8 @@ def _make_table_row(settings_info: SettingsInfoModel, field: FieldInfoModel) -> 
         default = q(field.default)
 
     example: str | None = None
-    if field.example:
-        example = q(field.example)
+    if field.examples:
+        example = ", ".join(q(example) for example in field.examples)
 
     return TableRowDict(
         Name=name,

@@ -135,19 +135,14 @@ local.*
 
 # YOUR IGNORINGS HERE
 .idea/
+.fleet/
+.vscode/
 tests/code_coverage/
 */tmp.py
+wiki/
 pyrightconig.json
 .python_version
 
-poetry.toml
-documents/
-bot_sessions/
-logs/
-tmp/
-wiki/
-www_repo/
-git_repos/
 
 !tests/data/documents/
 mongo/

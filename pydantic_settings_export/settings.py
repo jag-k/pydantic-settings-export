@@ -58,7 +58,14 @@ class DotEnvSettings(BaseSettings):
         env_prefix="DOTENV_",
     )
 
-    name: str = Field(".env.example", description="The name of the .env file.")
+    name: str = Field(
+        ".env.example",
+        description="The name of the .env file.",
+        examples=[
+            ".env.example",
+            ".env.sample",
+        ],
+    )
 
 
 class Settings(TomlSettings):
@@ -73,6 +80,10 @@ class Settings(TomlSettings):
     default_settings: list[str] = Field(
         default_factory=list,
         description="The default settings to use. The settings are applied in the order they are listed.",
+        examples=[
+            ["settings:Settings"],
+            ["app.config.settings:Settings", "app.config.settings.dev:Settings"],
+        ],
     )
 
     root_dir: Path = Field(

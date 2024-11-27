@@ -2,7 +2,7 @@ import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import Any, Self
+from typing import Any, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -21,11 +21,47 @@ __all__ = (
 BASE_SETTINGS_DOCS = getdoc(BaseSettings)
 
 
-def _prepare_example(example: Any) -> str:
+def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
+    if value_type is None:
+        value_type = type(value)
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return TypeAdapter(value_type).dump_json(value).decode()
+    except PydanticSerializationError:
+        return str(value)
+
+
+def _prepare_example(example: Any, value_type: type | None = None) -> str:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
-    return str(example)
+    return value_to_jsonable(example, value_type)
+
+
+P = TypeVar("P", bound=Path)
+
+
+def default_path(default: P, global_settings: Settings | None = None) -> P:
+    # Check if default is a Path and is absolute
+    if default.is_absolute():
+        # if we need to replace absolute paths
+        if global_settings and global_settings.relative_to.replace_abs_paths:
+            project_dir = global_settings.project_dir.resolve().absolute()
+
+            # Make the default path relative to the global_settings
+            if default.is_relative_to(project_dir):
+                default = Path(global_settings.relative_to.alias) / default.relative_to(
+                    global_settings.project_dir.resolve().absolute()
+                )
+
+        # Make the default path relative to the user's home directory
+        home_dir = Path.home().resolve().absolute()
+        if default.is_relative_to(home_dir):
+            default = "~" / default.relative_to(home_dir)
+
+    return default
 
 
 class FieldInfoModel(BaseModel):
@@ -35,13 +71,9 @@ class FieldInfoModel(BaseModel):
 
     name: str = Field(..., description="The name of the field.")
     type: str = Field(..., description="The type of the field.")
-    default: str | None = Field(
-        None,
-        description="The default value of the field as a string.",
-        validate_default=False,
-    )
+    default: str | None = Field(None, description="The default value of the field as a string.")
     description: str | None = Field(None, description="The description of the field.")
-    example: str | None = Field(None, description="The example of the field.")
+    examples: list[str] = Field(default_factory=list, description="The example of the field.")
     alias: str | None = Field(None, description="The alias of the field.")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
 
@@ -63,40 +95,17 @@ class FieldInfoModel(BaseModel):
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
 
+        if default is PydanticUndefined:
+            return None
+
         if isinstance(default, set):
             default = sorted(default)
 
         # Validate Path values
-        if (
-            # if we need to replace absolute paths
-            global_settings
-            and global_settings.relative_to.replace_abs_paths
-            # Check if default is a Path and is absolute
-            and isinstance(default, Path)
-            and default.is_absolute()
-        ):
-            project_dir = global_settings.project_dir.resolve().absolute()
-            home_dir = Path.home().resolve().absolute()
+        if isinstance(default, Path):
+            default = default_path(default, global_settings)
 
-            # Make the default path relative to the global_settings
-            if default.is_relative_to(project_dir):
-                default = Path(global_settings.relative_to.alias) / default.relative_to(
-                    global_settings.project_dir.resolve().absolute()
-                )
-
-            # Make the default path relative to the user's home directory
-            elif default.is_relative_to(home_dir):
-                default = "~" / default.relative_to(home_dir)
-
-        if default is PydanticUndefined:
-            return None
-
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                return TypeAdapter(field.annotation).dump_json(default).decode()
-        except PydanticSerializationError:
-            return str(default)
+        return value_to_jsonable(default)
 
     @classmethod
     def from_settings_field(
@@ -128,7 +137,7 @@ class FieldInfoModel(BaseModel):
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
-        example: str | None = _prepare_example(field.examples[0] if field.examples else default)
+        examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
         # Get the deprecated status from the field if it exists
         deprecated: bool = field.deprecated or False
 
@@ -137,7 +146,7 @@ class FieldInfoModel(BaseModel):
             type=type_,
             default=default,
             description=description,
-            example=example,
+            examples=examples or [default],
             alias=field.alias,
             deprecated=deprecated,
         )

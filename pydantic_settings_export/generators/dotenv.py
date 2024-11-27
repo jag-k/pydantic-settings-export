@@ -11,7 +11,7 @@ class DotEnvGenerator(AbstractGenerator):
     """The .env example generator."""
 
     def file_paths(self) -> list[Path]:
-        """Get the list of files, which need to create/update.
+        """Get the list of files which need to create/update.
 
         :return: The list of files to write.
         This is used to determine if the files need to be written.
@@ -31,8 +31,14 @@ class DotEnvGenerator(AbstractGenerator):
             if field.alias:
                 field_name = field.alias.upper()
 
-            field_string = f"{field_name}=\n" if field.is_required else f"# {field_name}={field.default}\n"
-            result += field_string
+            field_string = f"{field_name}="
+            if not field.is_required:
+                field_string = f"# {field_name}={field.default}"
+
+            if field.examples and field.examples != [field.default]:
+                field_string += "  # " + (", ".join(field.examples))
+
+            result += field_string + "\n"
 
         result = result.strip() + "\n\n"
 
