@@ -88,7 +88,6 @@ select = [
     'C90', # mccabe
 ]
 ignore = [
-    'B012', # {name} inside finally blocks cause exceptions to be silenced
     'D100', # Missing docstring in public module
     'D104', # Missing docstring in public package
     'D105', # Missing docstring in magic method
@@ -114,7 +113,6 @@ ignore = [
 # https://docs.astral.sh/ruff/settings/#lintpydocstyle
 [tool.ruff.lint.pydocstyle]
 convention = 'pep257'
-
 
 # https://docs.astral.sh/ruff/settings/#lintmccabe
 [tool.ruff.lint.mccabe]
@@ -163,12 +161,14 @@ enable_incomplete_feature = ["NewGenericSyntax"]
 [tool.pydantic_settings_export]
 project_dir = "."
 default_settings = [
-    "pydantic_settings_export.settings:Settings",
+    "pydantic_settings_export.settings:PSESettings",
 ]
-dotenv = { "name" = ".env.example" }
 env_file = ".env"
 
-[tool.pydantic_settings_export.markdown]
+[tool.pydantic_settings_export.generators.dotenv]
+name = ".env.example"
+
+[tool.pydantic_settings_export.generators.markdown]
 name = "Configuration.md"
 save_dirs = [
     "docs",

@@ -1,8 +1,7 @@
-import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -10,7 +9,11 @@ from pydantic_core import PydanticSerializationError, PydanticUndefined
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.constants import FIELD_TYPE_MAP
-from pydantic_settings_export.settings import Settings
+
+if TYPE_CHECKING:
+    from pydantic_settings_export.settings import PSESettings
+else:
+    PSESettings = BaseSettings
 
 __all__ = (
     "FieldInfoModel",
@@ -18,14 +21,49 @@ __all__ = (
 )
 
 
-BASE_SETTINGS_DOCS = getdoc(BaseSettings)
+BASE_SETTINGS_DOCS = getdoc(BaseSettings).strip()
+BASE_MODEL_DOCS = getdoc(BaseModel).strip()
 
 
-def _prepare_example(example: Any) -> str:
+def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
+    if value_type is None:
+        value_type = type(value)
+
+    try:
+        return TypeAdapter(value_type).dump_json(value).decode()
+    except PydanticSerializationError:
+        return str(value)
+
+
+def _prepare_example(example: Any, value_type: type | None = None) -> str:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
-    return str(example)
+    return value_to_jsonable(example, value_type)
+
+
+P = TypeVar("P", bound=Path)
+
+
+def default_path(default: P, global_settings: PSESettings | None = None) -> P:
+    # Check if default is a Path and is absolute
+    if default.is_absolute():
+        # if we need to replace absolute paths
+        if global_settings and global_settings.relative_to.replace_abs_paths:
+            project_dir = global_settings.project_dir.resolve().absolute()
+
+            # Make the default path relative to the global_settings
+            if default.is_relative_to(project_dir):
+                default = Path(global_settings.relative_to.alias) / default.relative_to(
+                    global_settings.project_dir.resolve().absolute()
+                )
+
+        # Make the default path relative to the user's home directory
+        home_dir = Path.home().resolve().absolute()
+        if default.is_relative_to(home_dir):
+            default = "~" / default.relative_to(home_dir)
+
+    return default
 
 
 class FieldInfoModel(BaseModel):
@@ -35,13 +73,9 @@ class FieldInfoModel(BaseModel):
 
     name: str = Field(..., description="The name of the field.")
     type: str = Field(..., description="The type of the field.")
-    default: str | None = Field(
-        None,
-        description="The default value of the field as a string.",
-        validate_default=False,
-    )
+    default: str | None = Field(None, description="The default value of the field as a string.")
     description: str | None = Field(None, description="The description of the field.")
-    example: str | None = Field(None, description="The example of the field.")
+    examples: list[str] = Field(default_factory=list, description="The example of the field.")
     alias: str | None = Field(None, description="The alias of the field.")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
 
@@ -51,7 +85,7 @@ class FieldInfoModel(BaseModel):
         return self.default is None
 
     @staticmethod
-    def create_default(field: FieldInfo, global_settings: Settings | None = None) -> str | None:
+    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
         """Make the default value for the field.
 
         :param field: The field info to generate the default value for.
@@ -63,47 +97,24 @@ class FieldInfoModel(BaseModel):
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
 
+        if default is PydanticUndefined:
+            return None
+
         if isinstance(default, set):
             default = sorted(default)
 
         # Validate Path values
-        if (
-            # if we need to replace absolute paths
-            global_settings
-            and global_settings.relative_to.replace_abs_paths
-            # Check if default is a Path and is absolute
-            and isinstance(default, Path)
-            and default.is_absolute()
-        ):
-            project_dir = global_settings.project_dir.resolve().absolute()
-            home_dir = Path.home().resolve().absolute()
+        if isinstance(default, Path):
+            default = default_path(default, global_settings)
 
-            # Make the default path relative to the global_settings
-            if default.is_relative_to(project_dir):
-                default = Path(global_settings.relative_to.alias) / default.relative_to(
-                    global_settings.project_dir.resolve().absolute()
-                )
-
-            # Make the default path relative to the user's home directory
-            elif default.is_relative_to(home_dir):
-                default = "~" / default.relative_to(home_dir)
-
-        if default is PydanticUndefined:
-            return None
-
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                return TypeAdapter(field.annotation).dump_json(default).decode()
-        except PydanticSerializationError:
-            return str(default)
+        return value_to_jsonable(default)
 
     @classmethod
     def from_settings_field(
         cls,
         name: str,
         field: FieldInfo,
-        global_settings: Settings | None = None,
+        global_settings: PSESettings | None = None,
     ) -> Self:
         """Generate FieldInfoModel using name and field.
 
@@ -128,7 +139,9 @@ class FieldInfoModel(BaseModel):
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
-        example: str | None = _prepare_example(field.examples[0] if field.examples else default)
+        examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
+        if not examples and default:
+            examples = [default]
         # Get the deprecated status from the field if it exists
         deprecated: bool = field.deprecated or False
 
@@ -137,7 +150,7 @@ class FieldInfoModel(BaseModel):
             type=type_,
             default=default,
             description=description,
-            example=example,
+            examples=examples,
             alias=field.alias,
             deprecated=deprecated,
         )
@@ -158,16 +171,25 @@ class SettingsInfoModel(BaseModel):
     def from_settings_model(
         cls,
         settings: BaseSettings | type[BaseSettings],
-        global_settings: Settings | None = None,
+        global_settings: PSESettings | None = None,
+        prefix: str = "",
+        nested_delimiter: str = "_",
     ) -> Self:
         """Generate SettingsInfoModel using a settings model.
 
         :param settings: The settings model to generate SettingsInfoModel from.
         :param global_settings: The global settings.
+        :param prefix: The prefix of the environment variables.
+        :param nested_delimiter: The delimiter to use for nested settings.
         :return: Instance of SettingsInfoModel.
         """
         conf = settings.model_config
         fields_info = settings.model_fields
+
+        # If the settings are a BaseSettings, then we can get the prefix and nested delimiter from the model config
+        if isinstance(settings, BaseSettings) or (isclass(settings) and issubclass(settings, BaseSettings)):
+            prefix = prefix + settings.model_config.get("env_prefix", "")
+            nested_delimiter = settings.model_config.get("env_nested_delimiter", "_")
 
         child_settings = []
         fields = []
@@ -175,15 +197,27 @@ class SettingsInfoModel(BaseModel):
             if global_settings and global_settings.respect_exclude and field_info.exclude:
                 continue
             annotation = field_info.annotation
-            if isclass(annotation) and issubclass(annotation, BaseSettings):
-                child_settings.append(cls.from_settings_model(annotation, global_settings=global_settings))
+
+            # If the annotation is a BaseModel (also match to BaseSettings),
+            # then we need to generate a SettingsInfoModel for it
+            if isclass(annotation) and issubclass(annotation, BaseModel):
+                child_settings.append(
+                    cls.from_settings_model(
+                        annotation,
+                        global_settings=global_settings,
+                        # Add the prefix and nested delimiter to the child settings
+                        # We need to change the prefix to uppercase to match the env prefix
+                        prefix=f"{prefix}{name}{nested_delimiter}".upper(),
+                        nested_delimiter=nested_delimiter,
+                    )
+                )
                 continue
             fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings))
 
         docs = getdoc(settings) or ""
 
-        # If the docs are the same as the base settings docs, then remove them
-        if BASE_SETTINGS_DOCS and (docs.strip() == BASE_SETTINGS_DOCS.strip()):
+        # If the docs are the same as the base model/settings docs, then remove them
+        if docs.strip() in (BASE_SETTINGS_DOCS, BASE_MODEL_DOCS):
             docs = ""
 
         # Remove all text after the first form feed character
@@ -199,7 +233,7 @@ class SettingsInfoModel(BaseModel):
                 or str(settings.__class__.__name__)
             ),
             docs=docs.strip(),
-            env_prefix=conf.get("env_prefix", ""),
+            env_prefix=prefix,
             fields=fields,
             child_settings=child_settings,
         )

@@ -9,8 +9,8 @@ from typing import Any
 from dotenv import dotenv_values
 
 from pydantic_settings_export.exporter import Exporter
-from pydantic_settings_export.generators import ALL_GENERATORS, AbstractGenerator
-from pydantic_settings_export.settings import Settings
+from pydantic_settings_export.generators import AbstractGenerator
+from pydantic_settings_export.settings import PSESettings
 from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
 from pydantic_settings_export.version import __version__
 
@@ -73,9 +73,13 @@ parser.add_argument(
 parser.add_argument(
     "--generator",
     "-g",
-    default=ALL_GENERATORS,
+    default=AbstractGenerator.ALL_GENERATORS,
     action=GeneratorAction,
-    help=f"The generator class or object to use. (default: [{', '.join(g.__name__ for g in ALL_GENERATORS)}])",
+    help=(
+        f"The generator class or object to use. (default: [{
+            ', '.join(g.__name__ for g in AbstractGenerator.ALL_GENERATORS)
+        }])"
+    ),
 )
 parser.add_argument(
     "settings",
@@ -97,14 +101,14 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
         os.environ.update(dotenv_values(stream=args.env_file))
 
     if args.config_file:
-        Settings.model_config["toml_file"] = args.config_file
-    s = Settings()
+        PSESettings.model_config["toml_file"] = args.config_file
+    s = PSESettings()
 
     if args.project_dir:
         s.project_dir = Path(args.project_dir).resolve().absolute()
     sys.path.insert(0, str(s.project_dir))
 
-    s.generators = args.generator
+    s.generators_list = args.generator
     settings = s.settings or [import_settings_from_string(s) for s in args.settings]
     if not settings:
         parser.exit(1, parser.format_help())

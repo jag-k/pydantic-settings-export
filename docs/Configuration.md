@@ -6,45 +6,52 @@ Here you can find all available configuration options using ENV variables.
 
 Global settings for pydantic_settings_export.
 
-**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT_`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__`
 
-| Name                                        | Type      | Default           | Description                                                                                                                                     | Example           |
-|---------------------------------------------|-----------|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `PYDANTIC_SETTINGS_EXPORT_DEFAULT_SETTINGS` | `list`    | `[]`              | The default settings to use. The settings are applied in the order they are listed.                                                             | `[]`              |
-| `PYDANTIC_SETTINGS_EXPORT_ROOT_DIR`         | `Path`    | `"<project_dir>"` | The project directory. Used for relative paths in the configuration file and .env file.                                                         | `"<project_dir>"` |
-| `PYDANTIC_SETTINGS_EXPORT_PROJECT_DIR`      | `Path`    | `"<project_dir>"` | The project directory. Used for relative paths in the configuration file and .env file.                                                         | `"<project_dir>"` |
-| `PYDANTIC_SETTINGS_EXPORT_RESPECT_EXCLUDE`  | `boolean` | `true`            | Respect the exclude attribute in the fields.                                                                                                    | `true`            |
-| `PYDANTIC_SETTINGS_EXPORT_ENV_FILE`         | `Path`    | `null`            | The path to the `.env` file to load environment variables. Useful, then you have a Settings class/instance, which require values while running. | `null`            |
+| Name                                         | Type      | Default           | Description                                                                                                                                     | Example                                                                                        |
+|----------------------------------------------|-----------|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| `PYDANTIC_SETTINGS_EXPORT__DEFAULT_SETTINGS` | `list`    | `[]`              | The default settings to use. The settings are applied in the order they are listed.                                                             | `["settings:settings"]`, `["app.config.settings:Settings","app.config.settings.dev:Settings"]` |
+| `PYDANTIC_SETTINGS_EXPORT__ROOT_DIR`         | `Path`    | `"<project_dir>"` | The project directory. Used for relative paths in the configuration file and .env file.                                                         | `"<project_dir>"`                                                                              |
+| `PYDANTIC_SETTINGS_EXPORT__PROJECT_DIR`      | `Path`    | `"<project_dir>"` | The project directory. Used for relative paths in the configuration file and .env file.                                                         | `"<project_dir>"`                                                                              |
+| `PYDANTIC_SETTINGS_EXPORT__RESPECT_EXCLUDE`  | `boolean` | `true`            | Respect the exclude attribute in the fields.                                                                                                    | `true`                                                                                         |
+| `PYDANTIC_SETTINGS_EXPORT__ENV_FILE`         | `Path`    | `null`            | The path to the `.env` file to load environment variables. Useful, then you have a Settings class/instance, which require values while running. | `null`                                                                                         |
 
 ### Relative Directory Settings
 
 Settings for the relative directory.
 
-**Environment Prefix**: `RELATIVE_TO_`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__`
 
-| Name                            | Type      | Default           | Description                                                | Example           |
-|---------------------------------|-----------|-------------------|------------------------------------------------------------|-------------------|
-| `RELATIVE_TO_REPLACE_ABS_PATHS` | `boolean` | `true`            | Replace absolute paths with relative path to project root. | `true`            |
-| `RELATIVE_TO_ALIAS`             | `string`  | `"<project_dir>"` | The alias for the relative directory.                      | `"<project_dir>"` |
+| Name                                                       | Type      | Default           | Description                                                | Example           |
+|------------------------------------------------------------|-----------|-------------------|------------------------------------------------------------|-------------------|
+| `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__REPLACE_ABS_PATHS` | `boolean` | `true`            | Replace absolute paths with relative path to project root. | `true`            |
+| `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__ALIAS`             | `string`  | `"<project_dir>"` | The alias for the relative directory.                      | `"<project_dir>"` |
 
-### Configuration File Settings
+### Generators
 
-Settings for the Markdown file.
+The configuration of generators.
 
-**Environment Prefix**: `CONFIG_FILE_`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__`
 
-| Name                    | Type      | Default              | Description                                     | Example              |
-|-------------------------|-----------|----------------------|-------------------------------------------------|----------------------|
-| `CONFIG_FILE_ENABLED`   | `boolean` | `true`               | Enable the configuration file generation.       | `true`               |
-| `CONFIG_FILE_NAME`      | `string`  | `"Configuration.md"` | The name of the configuration file.             | `"Configuration.md"` |
-| `CONFIG_FILE_SAVE_DIRS` | `list`    | `[]`                 | The directories to save configuration files to. | `[]`                 |
-
-### .env File Settings
+#### Generator: dotenv File Settings
 
 Settings for the .env file.
 
-**Environment Prefix**: `DOTENV_`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__`
 
-| Name          | Type     | Default          | Description                | Example          |
-|---------------|----------|------------------|----------------------------|------------------|
-| `DOTENV_NAME` | `string` | `".env.example"` | The name of the .env file. | `".env.example"` |
+| Name                                                    | Type      | Default          | Description                        | Example                           |
+|---------------------------------------------------------|-----------|------------------|------------------------------------|-----------------------------------|
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__ENABLED` | `boolean` | `true`           | Enable the dotenv file generation. | `true`                            |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__NAME`    | `Path`    | `".env.example"` | The name of the .env file.         | `".env.example"`, `".env.sample"` |
+
+#### Generator: Markdown Configuration File Settings
+
+Settings for the Markdown file.
+
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__`
+
+| Name                                                        | Type      | Default              | Description                                     | Example              |
+|-------------------------------------------------------------|-----------|----------------------|-------------------------------------------------|----------------------|
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__ENABLED`   | `boolean` | `true`               | Enable the configuration file generation.       | `true`               |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__NAME`      | `string`  | `"Configuration.md"` | The name of the configuration file.             | `"Configuration.md"` |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__SAVE_DIRS` | `list`    | `[]`                 | The directories to save configuration files to. | `[]`                 |

@@ -1,78 +1,47 @@
+import warnings
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import Field, SkipValidation, model_validator
+from pydantic import BaseModel, Field, SkipValidation, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pydantic_settings_export.constants import StrAsPath
-from pydantic_settings_export.generators.abstract import AbstractGenerator
+from pydantic_settings_export.generators import AbstractGenerator, Generators
 from pydantic_settings_export.sources import TomlSettings
 from pydantic_settings_export.utils import import_settings_from_string
 
 __all__ = (
-    "MarkdownSettings",
-    "DotEnvSettings",
     "RelativeToSettings",
-    "Settings",
+    "PSESettings",
 )
 
 
-class RelativeToSettings(BaseSettings):
+class RelativeToSettings(BaseModel):
     """Settings for the relative directory."""
 
-    model_config = SettingsConfigDict(
-        title="Relative Directory Settings",
-        env_prefix="RELATIVE_TO_",
-    )
+    model_config = SettingsConfigDict(title="Relative Directory Settings")
 
     replace_abs_paths: bool = Field(True, description="Replace absolute paths with relative path to project root.")
     alias: str = Field("<project_dir>", description="The alias for the relative directory.")
 
 
-class MarkdownSettings(BaseSettings):
-    """Settings for the Markdown file."""
-
-    model_config = SettingsConfigDict(
-        title="Configuration File Settings",
-        env_prefix="CONFIG_FILE_",
-    )
-
-    enabled: bool = Field(True, description="Enable the configuration file generation.")
-    name: str = Field("Configuration.md", description="The name of the configuration file.")
-
-    save_dirs: list[StrAsPath] = Field(
-        default_factory=list, description="The directories to save configuration files to."
-    )
-
-    def __bool__(self) -> bool:
-        """Check if the configuration file is set."""
-        return self.enabled and bool(self.save_dirs)
-
-
-class DotEnvSettings(BaseSettings):
-    """Settings for the .env file."""
-
-    model_config = SettingsConfigDict(
-        title=".env File Settings",
-        env_prefix="DOTENV_",
-    )
-
-    name: str = Field(".env.example", description="The name of the .env file.")
-
-
-class Settings(TomlSettings):
+class PSESettings(TomlSettings):
     """Global settings for pydantic_settings_export."""
 
     model_config = SettingsConfigDict(
         title="Global Settings",
-        env_prefix="PYDANTIC_SETTINGS_EXPORT_",
+        env_prefix="PYDANTIC_SETTINGS_EXPORT__",
+        env_nested_delimiter="__",
         pyproject_toml_table_header=("tool", "pydantic_settings_export"),
     )
 
     default_settings: list[str] = Field(
         default_factory=list,
         description="The default settings to use. The settings are applied in the order they are listed.",
+        examples=[
+            ["settings:settings"],
+            ["app.config.settings:Settings", "app.config.settings.dev:Settings"],
+        ],
     )
 
     root_dir: Path = Field(
@@ -89,21 +58,14 @@ class Settings(TomlSettings):
         default_factory=RelativeToSettings,
         description="The relative directory settings.",
     )
-    markdown: MarkdownSettings = Field(
-        default_factory=MarkdownSettings,
-        description="The configuration of markdown file settings.",
-    )
-    dotenv: DotEnvSettings = Field(
-        default_factory=DotEnvSettings,
-        description="The .env file settings.",
+    respect_exclude: bool = Field(True, description="Respect the exclude attribute in the fields.")
+
+    generators: Generators = Field(
+        default_factory=Generators,
+        description="The configuration of generators.",
     )
 
-    respect_exclude: bool = Field(
-        True,
-        description="Respect the exclude attribute in the fields.",
-    )
-
-    generators: list[SkipValidation[type["AbstractGenerator"]]] = Field(
+    generators_list: list[SkipValidation[type["AbstractGenerator"]]] = Field(
         default_factory=list,
         description="The list of generators to use.",
         exclude=True,
@@ -122,7 +84,28 @@ class Settings(TomlSettings):
         """Get the settings."""
         return [import_settings_from_string(i) for i in self.default_settings or []]
 
-    # noinspection PyNestedDecorators
+    @model_validator(mode="before")
+    @classmethod
+    def validate_generators(cls, data: Any) -> Any:
+        """Validate the generators."""
+        if isinstance(data, dict):
+            generators = data.setdefault("generators", {})
+
+            for generator in AbstractGenerator.ALL_GENERATORS:
+                config = data.pop(generator.name, None)
+                if config:
+                    warnings.warn(
+                        f"You use the old-style to set generator {generator.name} config. "
+                        f"Please, use the new-style:\n"
+                        f"- For toml file: `[tool.pydantic_settings_export.generators.{generator.name}]`\n"
+                        f"- For ENV: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__{generator.name.upper()}__`\n"
+                        f"The old-style will be removed in the future!",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    generators[generator.name] = config
+        return data
+
     @model_validator(mode="before")
     @classmethod
     def validate_env_file(cls, data: Any) -> Any:
