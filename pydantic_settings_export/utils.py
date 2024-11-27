@@ -4,6 +4,10 @@ import sys
 from collections.abc import Sequence
 from typing import Any
 
+from pydantic import ImportString, TypeAdapter
+from pydantic_core import ValidationError
+from pydantic_settings import BaseSettings
+
 __all__ = (
     "make_pretty_md_table",
     "make_pretty_md_table_from_dict",
@@ -122,3 +126,38 @@ class ObjectImportAction(argparse.Action):
                 parser.exit(2, f"{parser.prog}: error: {argparse.ArgumentError(self, str(e))}\n")
 
         setattr(namespace, self.dest, result)
+
+
+class MissingSettingsError(ValueError):
+    """Raised when the settings are missing."""
+
+    def __init__(self, missing: dict[str | int, str], settings_path: str = "Settings") -> None:
+        missing_as_str = "\n".join(
+            f"  - `{k if '.' in k else settings_path + '.' + k}`: {v}"
+            #
+            for k, v in missing.items()
+        )
+        super().__init__(
+            f"You have {len(missing)} missing settings:\n{missing_as_str}\n\n"
+            f"Please, set this required ENV Vars into your .env files.\n"
+            f"This can be happened if you call the {settings_path} directly in your settings file."
+        )
+
+
+def import_settings_from_string(value: str) -> BaseSettings:
+    """Import the settings from the string."""
+    obj: BaseSettings
+    try:
+        obj = TypeAdapter(ImportString).validate_python(value)
+    except ValidationError as err:
+        missing: dict[str | int, str] = {}
+        for details in err.errors():
+            if details["type"] == "missing":
+                missing[details["loc"][0]] = details["msg"]
+        if missing:
+            raise MissingSettingsError(missing=missing, settings_path=value) from err
+        raise err from None
+
+    if isinstance(obj, type) and not issubclass(obj, BaseSettings) and not isinstance(obj, BaseSettings):
+        raise ValueError(f"The {obj!r} is not a settings class.")
+    return obj

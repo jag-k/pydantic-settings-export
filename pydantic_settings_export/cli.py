@@ -10,8 +10,8 @@ from dotenv import dotenv_values
 
 from pydantic_settings_export.exporter import Exporter
 from pydantic_settings_export.generators import ALL_GENERATORS, AbstractGenerator
-from pydantic_settings_export.settings import Settings, import_settings_from_string
-from pydantic_settings_export.utils import ObjectImportAction
+from pydantic_settings_export.settings import Settings
+from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
 from pydantic_settings_export.version import __version__
 
 CDW = Path.cwd()

@@ -44,23 +44,21 @@ repos:
         always_run: true
 
   - repo: https://github.com/bwhmather/ssort
-    rev: 0.13.0
+    rev: 0.14.0
     hooks:
       - id: ssort
         entry: ssort
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.7.0
+    rev: v0.8.0
     hooks:
-      # Run the linter.
       - id: ruff
         args: [ --fix ]
-      # Run the formatter.
       - id: ruff-format
 
   - repo: local
     hooks:
-    -   id: pydantic-settings-export
+      - id: pydantic-settings-export
         name: pydantic-settings-export
         entry: pydantic-settings-export
         language: python

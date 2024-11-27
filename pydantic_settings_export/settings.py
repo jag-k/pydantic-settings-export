@@ -2,12 +2,13 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import Field, ImportString, SkipValidation, TypeAdapter, model_validator
+from pydantic import Field, SkipValidation, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export.constants import StrAsPath
 from pydantic_settings_export.generators.abstract import AbstractGenerator
 from pydantic_settings_export.sources import TomlSettings
+from pydantic_settings_export.utils import import_settings_from_string
 
 __all__ = (
     "MarkdownSettings",
@@ -15,14 +16,6 @@ __all__ = (
     "RelativeToSettings",
     "Settings",
 )
-
-
-def import_settings_from_string(value: str) -> BaseSettings:
-    """Import the settings from the string."""
-    obj = TypeAdapter(ImportString).validate_python(value)
-    if isinstance(obj, type) and not issubclass(obj, BaseSettings) and not isinstance(obj, BaseSettings):
-        raise ValueError(f"The {obj!r} is not a settings class.")
-    return obj
 
 
 class RelativeToSettings(BaseSettings):

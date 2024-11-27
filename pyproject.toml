@@ -40,13 +40,16 @@ dependencies = [
 [project.scripts]
 pydantic-settings-export = "pydantic_settings_export.cli:main"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "mypy>=1.12.1",
     "pre-commit>=4.0.1",
     "ruff>=0.7.0",
     "ssort>=0.13.0",
     "types-pyyaml>=6.0.12.20240917",
+]
+tests = [
+    "pytest>=8.3.3",
 ]
 
 [build-system]
@@ -75,6 +78,8 @@ select = [
     'F', # flake8
     'I', # isort
     'B', # flake8-bugbear
+    'S', # flake8-bandit
+    'UP', # pyupgrade
     'D', # pydocstyle
     'W', # pycodestyle (warnings)
     'E', # pycodestyle (errors)
@@ -153,6 +158,7 @@ disable_error_code = [
     "call-arg",
 ]
 enable_incomplete_feature = ["NewGenericSyntax"]
+
 # https://github.com/jag-k/pydantic-settings-export
 [tool.pydantic_settings_export]
 project_dir = "."
@@ -161,7 +167,6 @@ default_settings = [
 ]
 dotenv = { "name" = ".env.example" }
 env_file = ".env"
-
 
 [tool.pydantic_settings_export.markdown]
 name = "Configuration.md"
