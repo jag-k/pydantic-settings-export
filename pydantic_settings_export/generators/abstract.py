@@ -52,7 +52,7 @@ class AbstractGenerator(ABC):
         """
 
     @classmethod
-    def run(cls, settings: Settings, settings_info: SettingsInfoModel) -> list[Path]:
+    def run(cls, settings: Settings, *settings_info: SettingsInfoModel) -> list[Path]:
         """Run the generator.
 
         :param settings: The settings for the generator.
@@ -60,7 +60,7 @@ class AbstractGenerator(ABC):
         :return: The list of file paths is written to.
         """
         generator = cls(settings)
-        result = generator.generate(settings_info)
+        result = generator.generate(*settings_info)
         file_paths = generator.file_paths()
         updated_files: list[Path] = []
         for path in file_paths:
