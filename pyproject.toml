@@ -165,11 +165,13 @@ project_dir = "."
 default_settings = [
     "pydantic_settings_export.settings:Settings",
 ]
-dotenv = { "name" = ".env.example" }
 env_file = ".env"
 
-[tool.pydantic_settings_export.markdown]
-name = "Configuration.md"
+[tool.pydantic_settings_export.generators.dotenv]
+path = ".env.example"
+
+[tool.pydantic_settings_export.generators.markdown]
+path = "Configuration.md"
 save_dirs = [
     "docs",
     "wiki",

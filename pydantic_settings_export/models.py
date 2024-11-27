@@ -2,7 +2,7 @@ import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -10,7 +10,11 @@ from pydantic_core import PydanticSerializationError, PydanticUndefined
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.constants import FIELD_TYPE_MAP
-from pydantic_settings_export.settings import Settings
+
+if TYPE_CHECKING:
+    from pydantic_settings_export.settings import Settings
+else:
+    Settings = BaseSettings
 
 __all__ = (
     "FieldInfoModel",
@@ -18,7 +22,8 @@ __all__ = (
 )
 
 
-BASE_SETTINGS_DOCS = getdoc(BaseSettings)
+BASE_SETTINGS_DOCS = getdoc(BaseSettings).strip()
+BASE_MODEL_DOCS = getdoc(BaseModel).strip()
 
 
 def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
@@ -138,6 +143,8 @@ class FieldInfoModel(BaseModel):
         description: str | None = field.description or None
         # Get the example from the field if it exists
         examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
+        if not examples and default:
+            examples = [default]
         # Get the deprecated status from the field if it exists
         deprecated: bool = field.deprecated or False
 
@@ -146,7 +153,7 @@ class FieldInfoModel(BaseModel):
             type=type_,
             default=default,
             description=description,
-            examples=examples or [default],
+            examples=examples,
             alias=field.alias,
             deprecated=deprecated,
         )
@@ -168,15 +175,24 @@ class SettingsInfoModel(BaseModel):
         cls,
         settings: BaseSettings | type[BaseSettings],
         global_settings: Settings | None = None,
+        prefix: str = "",
+        nested_delimiter: str = "_",
     ) -> Self:
         """Generate SettingsInfoModel using a settings model.
 
         :param settings: The settings model to generate SettingsInfoModel from.
         :param global_settings: The global settings.
+        :param prefix: The prefix of the environment variables.
+        :param nested_delimiter: The delimiter to use for nested settings.
         :return: Instance of SettingsInfoModel.
         """
         conf = settings.model_config
         fields_info = settings.model_fields
+
+        # If the settings are a BaseSettings, then we can get the prefix and nested delimiter from the model config
+        if isinstance(settings, BaseSettings) or (isclass(settings) and issubclass(settings, BaseSettings)):
+            prefix = prefix + settings.model_config.get("env_prefix", "")
+            nested_delimiter = settings.model_config.get("env_nested_delimiter", "_")
 
         child_settings = []
         fields = []
@@ -184,15 +200,27 @@ class SettingsInfoModel(BaseModel):
             if global_settings and global_settings.respect_exclude and field_info.exclude:
                 continue
             annotation = field_info.annotation
-            if isclass(annotation) and issubclass(annotation, BaseSettings):
-                child_settings.append(cls.from_settings_model(annotation, global_settings=global_settings))
+
+            # If the annotation is a BaseModel (also match to BaseSettings),
+            # then we need to generate a SettingsInfoModel for it
+            if isclass(annotation) and issubclass(annotation, BaseModel):
+                child_settings.append(
+                    cls.from_settings_model(
+                        annotation,
+                        global_settings=global_settings,
+                        # Add the prefix and nested delimiter to the child settings
+                        # We need to change the prefix to uppercase to match the env prefix
+                        prefix=f"{prefix}{name}{nested_delimiter}".upper(),
+                        nested_delimiter=nested_delimiter,
+                    )
+                )
                 continue
             fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings))
 
         docs = getdoc(settings) or ""
 
-        # If the docs are the same as the base settings docs, then remove them
-        if BASE_SETTINGS_DOCS and (docs.strip() == BASE_SETTINGS_DOCS.strip()):
+        # If the docs are the same as the base model/settings docs, then remove them
+        if docs.strip() in (BASE_SETTINGS_DOCS, BASE_MODEL_DOCS):
             docs = ""
 
         # Remove all text after the first form feed character
@@ -208,7 +236,7 @@ class SettingsInfoModel(BaseModel):
                 or str(settings.__class__.__name__)
             ),
             docs=docs.strip(),
-            env_prefix=conf.get("env_prefix", ""),
+            env_prefix=prefix,
             fields=fields,
             child_settings=child_settings,
         )

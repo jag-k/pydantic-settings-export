@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from pydantic_settings_export.models import SettingsInfoModel
 
 from .abstract import AbstractGenerator
@@ -7,8 +9,28 @@ from .abstract import AbstractGenerator
 __all__ = ("DotEnvGenerator",)
 
 
+class DotEnvSettings(BaseModel):
+    """Settings for the .env file."""
+
+    model_config = ConfigDict(title="Generator: dotenv File Settings")
+
+    enabled: bool = Field(True, description="Enable the dotenv file generation.")
+    path: Path = Field(
+        ".env.example",
+        description="The name of the .env file.",
+        examples=[
+            ".env.example",
+            ".env.sample",
+        ],
+    )
+
+
 class DotEnvGenerator(AbstractGenerator):
     """The .env example generator."""
+
+    name = __name__
+    config = DotEnvSettings
+    generator_config: DotEnvSettings
 
     def file_paths(self) -> list[Path]:
         """Get the list of files which need to create/update.
@@ -16,7 +38,9 @@ class DotEnvGenerator(AbstractGenerator):
         :return: The list of files to write.
         This is used to determine if the files need to be written.
         """
-        return [self.settings.root_dir / self.settings.dotenv.name]
+        if not self.generator_config.enabled:
+            return []
+        return [self.settings.root_dir / self.generator_config.path]
 
     def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
         """Generate a .env example for a pydantic settings class.

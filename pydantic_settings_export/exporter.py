@@ -18,7 +18,7 @@ class Exporter:
         generators: list[type[AbstractGenerator]] | None = None,
     ) -> None:
         self.settings: Settings = settings or Settings()
-        self.generators: list[type[AbstractGenerator]] = settings.generators if generators is None else generators
+        self.generators: list[type[AbstractGenerator]] = settings.generators_list if generators is None else generators
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
         """Run all generators for the given settings.
