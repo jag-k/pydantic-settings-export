@@ -99,7 +99,7 @@ def _make_table_row(settings_info: SettingsInfoModel, field: FieldInfoModel) -> 
 class MarkdownGenerator(AbstractGenerator):
     """The Markdown configuration file generator."""
 
-    name = __name__
+    name = "markdown"
     config = MarkdownSettings
     generator_config: MarkdownSettings
 

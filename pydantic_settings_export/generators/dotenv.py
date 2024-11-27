@@ -15,7 +15,7 @@ class DotEnvSettings(BaseModel):
     model_config = ConfigDict(title="Generator: dotenv File Settings")
 
     enabled: bool = Field(True, description="Enable the dotenv file generation.")
-    path: Path = Field(
+    name: Path = Field(
         ".env.example",
         description="The name of the .env file.",
         examples=[
@@ -28,7 +28,7 @@ class DotEnvSettings(BaseModel):
 class DotEnvGenerator(AbstractGenerator):
     """The .env example generator."""
 
-    name = __name__
+    name = "dotenv"
     config = DotEnvSettings
     generator_config: DotEnvSettings
 
@@ -40,7 +40,7 @@ class DotEnvGenerator(AbstractGenerator):
         """
         if not self.generator_config.enabled:
             return []
-        return [self.settings.root_dir / self.generator_config.path]
+        return [self.settings.root_dir / self.generator_config.name]
 
     def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
         """Generate a .env example for a pydantic settings class.

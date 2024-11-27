@@ -27,25 +27,31 @@ Settings for the relative directory.
 | `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__REPLACE_ABS_PATHS` | `boolean` | `true`            | Replace absolute paths with relative path to project root. | `true`            |
 | `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__ALIAS`             | `string`  | `"<project_dir>"` | The alias for the relative directory.                      | `"<project_dir>"` |
 
-### Generator: Markdown Configuration File Settings
+### Generators
 
-Settings for the Markdown file.
+The configuration of generators.
 
-**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__MARKDOWN__`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__`
 
-| Name                                            | Type      | Default              | Description                                     | Example              |
-|-------------------------------------------------|-----------|----------------------|-------------------------------------------------|----------------------|
-| `PYDANTIC_SETTINGS_EXPORT__MARKDOWN__ENABLED`   | `boolean` | `true`               | Enable the configuration file generation.       | `true`               |
-| `PYDANTIC_SETTINGS_EXPORT__MARKDOWN__NAME`      | `string`  | `"Configuration.md"` | The name of the configuration file.             | `"Configuration.md"` |
-| `PYDANTIC_SETTINGS_EXPORT__MARKDOWN__SAVE_DIRS` | `list`    | `[]`                 | The directories to save configuration files to. | `[]`                 |
-
-### Generator: dotenv File Settings
+#### Generator: dotenv File Settings
 
 Settings for the .env file.
 
-**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__DOTENV__`
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__`
 
-| Name                                        | Type      | Default          | Description                        | Example                           |
-|---------------------------------------------|-----------|------------------|------------------------------------|-----------------------------------|
-| `PYDANTIC_SETTINGS_EXPORT__DOTENV__ENABLED` | `boolean` | `true`           | Enable the dotenv file generation. | `true`                            |
-| `PYDANTIC_SETTINGS_EXPORT__DOTENV__PATH`    | `Path`    | `".env.example"` | The name of the .env file.         | `".env.example"`, `".env.sample"` |
+| Name                                                    | Type      | Default          | Description                        | Example                           |
+|---------------------------------------------------------|-----------|------------------|------------------------------------|-----------------------------------|
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__ENABLED` | `boolean` | `true`           | Enable the dotenv file generation. | `true`                            |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__DOTENV__NAME`    | `Path`    | `".env.example"` | The name of the .env file.         | `".env.example"`, `".env.sample"` |
+
+#### Generator: Markdown Configuration File Settings
+
+Settings for the Markdown file.
+
+**Environment Prefix**: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__`
+
+| Name                                                        | Type      | Default              | Description                                     | Example              |
+|-------------------------------------------------------------|-----------|----------------------|-------------------------------------------------|----------------------|
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__ENABLED`   | `boolean` | `true`               | Enable the configuration file generation.       | `true`               |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__NAME`      | `string`  | `"Configuration.md"` | The name of the configuration file.             | `"Configuration.md"` |
+| `PYDANTIC_SETTINGS_EXPORT__GENERATORS__MARKDOWN__SAVE_DIRS` | `list`    | `[]`                 | The directories to save configuration files to. | `[]`                 |

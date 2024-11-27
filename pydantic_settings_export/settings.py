@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -83,7 +84,28 @@ class PSESettings(TomlSettings):
         """Get the settings."""
         return [import_settings_from_string(i) for i in self.default_settings or []]
 
-    # noinspection PyNestedDecorators
+    @model_validator(mode="before")
+    @classmethod
+    def validate_generators(cls, data: Any) -> Any:
+        """Validate the generators."""
+        if isinstance(data, dict):
+            generators = data.setdefault("generators", {})
+
+            for generator in AbstractGenerator.ALL_GENERATORS:
+                config = data.pop(generator.name, None)
+                if config:
+                    warnings.warn(
+                        f"You use the old-style to set generator {generator.name} config. "
+                        f"Please, use the new-style:\n"
+                        f"- For toml file: `[tool.pydantic_settings_export.generators.{generator.name}]`\n"
+                        f"- For ENV: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__{generator.name.upper()}__`\n"
+                        f"The old-style will be removed in the future!",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    generators[generator.name] = config
+        return data
+
     @model_validator(mode="before")
     @classmethod
     def validate_env_file(cls, data: Any) -> Any:

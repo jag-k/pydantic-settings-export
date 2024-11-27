@@ -1,4 +1,3 @@
-import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
@@ -31,9 +30,7 @@ def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
         value_type = type(value)
 
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            return TypeAdapter(value_type).dump_json(value).decode()
+        return TypeAdapter(value_type).dump_json(value).decode()
     except PydanticSerializationError:
         return str(value)
 

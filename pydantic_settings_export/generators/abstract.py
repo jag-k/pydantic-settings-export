@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias, TypeVar, final
 
 from pydantic import BaseModel, Field, create_model
-from pydantic_settings import BaseSettings
 
 if TYPE_CHECKING:
     from pydantic_settings_export.models import SettingsInfoModel
@@ -11,7 +10,7 @@ if TYPE_CHECKING:
 
 else:
     SettingsInfoModel: TypeAlias = BaseModel
-    PSESettings: TypeAlias = BaseSettings
+    PSESettings: TypeAlias = BaseModel
 
 
 __all__ = ("AbstractGenerator",)
@@ -111,4 +110,5 @@ class AbstractGenerator(ABC):
                 for generator in AbstractGenerator.ALL_GENERATORS
             },
             __base__=BaseModel,
+            __doc__="The configuration of generators.",
         )
