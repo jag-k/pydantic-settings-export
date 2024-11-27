@@ -76,7 +76,7 @@ You can add a `pydantic_settings_export` section to your `pyproject.toml` file t
 [tool.pydantic_settings_export]
 project_dir = "."
 default_settings = [
-  "pydantic_settings_export.settings:Settings",
+  "pydantic_settings_export.settings:PSESettings",
 ]
 
 [tool.pydantic_settings_export.generators.dotenv]
