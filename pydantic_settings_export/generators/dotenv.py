@@ -1,28 +1,56 @@
+import warnings
 from pathlib import Path
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field, model_validator
 
 from pydantic_settings_export.models import SettingsInfoModel
 
-from .abstract import AbstractGenerator
+from .abstract import AbstractGenerator, BaseGeneratorSettings
 
 __all__ = ("DotEnvGenerator",)
 
+DotEnvMode = Literal["all", "only-optional", "only-required"]
 
-class DotEnvSettings(BaseModel):
+
+class DotEnvSettings(BaseGeneratorSettings):
     """Settings for the .env file."""
 
     model_config = ConfigDict(title="Generator: dotenv File Settings")
 
-    enabled: bool = Field(True, description="Enable the dotenv file generation.")
-    name: Path = Field(
-        ".env.example",
+    name: Path | None = Field(
+        None,
         description="The name of the .env file.",
         examples=[
             ".env.example",
             ".env.sample",
         ],
+        deprecated=True,
     )
+
+    paths: list[Path] = Field(
+        default_factory=lambda: [Path(".env.example")],
+        description="The paths to the resulting files.",
+    )
+
+    split_by_group: bool = Field(True, description="Whether to split the environment variables by group (headers).")
+    add_examples: bool = Field(True, description="Whether to add examples to the environment variables.")
+    mode: DotEnvMode = Field(
+        "all",
+        description="The mode to export for the environment variables. For more information, see the README.",
+    )
+
+    @model_validator(mode="after")
+    def validate_paths(self) -> Self:
+        """Validate the paths."""
+        if self.name:
+            warnings.warn(
+                "The `name` attribute is deprecated and will be removed in the future. Use `paths` instead.",
+                DeprecationWarning,
+                stacklevel=1,
+            )
+            self.paths = [self.name]
+        return self
 
 
 class DotEnvGenerator(AbstractGenerator):
@@ -32,16 +60,6 @@ class DotEnvGenerator(AbstractGenerator):
     config = DotEnvSettings
     generator_config: DotEnvSettings
 
-    def file_paths(self) -> list[Path]:
-        """Get the list of files which need to create/update.
-
-        :return: The list of files to write.
-        This is used to determine if the files need to be written.
-        """
-        if not self.generator_config.enabled:
-            return []
-        return [self.settings.root_dir / self.generator_config.name]
-
     def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
         """Generate a .env example for a pydantic settings class.
 
@@ -49,22 +67,36 @@ class DotEnvGenerator(AbstractGenerator):
         :param settings_info: The settings class to generate a .env example for.
         :return: The generated .env example.
         """
-        result = f"### {settings_info.name}\n\n"
+        result = ""
+        is_optional, is_required = {
+            "all": (True, True),
+            "only-optional": (True, False),
+            "only-required": (False, True),
+        }.get(self.generator_config.mode, (True, True))
+
+        if self.generator_config.split_by_group:
+            result = f"### {settings_info.name}\n\n"
+
         for field in settings_info.fields:
             field_name = f"{settings_info.env_prefix}{field.name.upper()}"
-            if field.alias:
-                field_name = field.alias.upper()
+            if field.aliases:
+                field_name = field.aliases[0].upper()
 
             field_string = f"{field_name}="
-            if not field.is_required:
+            if not field.is_required and is_optional:
                 field_string = f"# {field_name}={field.default}"
 
-            if field.examples and field.examples != [field.default]:
+            elif field.is_required and not is_required:
+                continue
+
+            if field.examples and field.examples != [field.default] and self.generator_config.add_examples:
                 field_string += "  # " + (", ".join(field.examples))
 
             result += field_string + "\n"
 
-        result = result.strip() + "\n\n"
+        result = result.strip() + "\n"
+        if self.generator_config.split_by_group:
+            result += "\n"
 
         for child in settings_info.child_settings:
             result += self.generate_single(child)

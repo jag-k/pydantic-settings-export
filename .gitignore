@@ -138,6 +138,7 @@ local.*
 .fleet/
 .vscode/
 tests/code_coverage/
+__pycache__/
 */tmp.py
 wiki/
 pyrightconig.json

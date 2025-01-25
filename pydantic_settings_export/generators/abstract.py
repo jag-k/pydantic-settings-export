@@ -4,18 +4,38 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias, TypeVar, final
 
 from pydantic import BaseModel, Field, create_model
 
+from pydantic_settings_export.settings import PSESettings
+
 if TYPE_CHECKING:
     from pydantic_settings_export.models import SettingsInfoModel
-    from pydantic_settings_export.settings import PSESettings
 
 else:
     SettingsInfoModel: TypeAlias = BaseModel
-    PSESettings: TypeAlias = BaseModel
 
 
 __all__ = ("AbstractGenerator",)
 
-C = TypeVar("C", bound=BaseModel)
+
+class BaseGeneratorSettings(BaseModel):
+    """Base model config for the generator."""
+
+    enabled: bool = Field(
+        True,
+        description="Enable the configuration for file generation.",
+        exclude=True,
+    )
+
+    paths: list[Path] = Field(
+        default_factory=lambda: [],
+        description="The paths to the resulting files.",
+    )
+
+    def __bool__(self) -> bool:
+        """Check if the configuration file is set."""
+        return self.enabled and bool(self.paths)
+
+
+C = TypeVar("C", bound=BaseGeneratorSettings)
 
 
 class AbstractGenerator(ABC):
@@ -26,13 +46,13 @@ class AbstractGenerator(ABC):
 
     ALL_GENERATORS: ClassVar[list[type["AbstractGenerator"]]] = []
 
-    def __init__(self, settings: PSESettings) -> None:
+    def __init__(self, settings: PSESettings, generator_config: C | None = None) -> None:
         """Initialize the AbstractGenerator.
 
         :param settings: The settings for the generator.
         """
         self.settings = settings
-        self.generator_config: C = getattr(settings.generators, self.name)
+        self.generator_config: C = generator_config if generator_config else self.config()
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Initialize the subclass."""
@@ -43,6 +63,7 @@ class AbstractGenerator(ABC):
             raise ValueError("Generator must have a config")
         if cls.name in AbstractGenerator.ALL_GENERATORS:
             raise ValueError(f"Generator {cls.name} already exists")
+        cls.config.__doc__ += f"\n\nGenerator name: `{cls.name}`."
 
         AbstractGenerator.ALL_GENERATORS.append(cls)
 
@@ -64,26 +85,30 @@ class AbstractGenerator(ABC):
         """
         return "\n\n".join(self.generate_single(s).strip() for s in settings_infos).strip() + "\n"
 
-    @abstractmethod
     def file_paths(self) -> list[Path]:
         """Get the list of files which need to create/update.
 
         :return: The list of files to write.
         This is used to determine if the files need to be written.
         """
-        raise NotImplementedError
+        if not self.generator_config:
+            return []
+        file_paths = []
+        for p in self.generator_config.paths:
+            if p.is_absolute():
+                file_paths.append(p)
+                continue
+            file_paths.append(self.settings.root_dir / p)
+        return file_paths
 
-    @classmethod
-    def run(cls, settings: PSESettings, *settings_info: SettingsInfoModel) -> list[Path]:
+    def run(self, *settings_info: SettingsInfoModel) -> list[Path]:
         """Run the generator.
 
-        :param settings: The settings for the generator.
         :param settings_info: The settings info to generate documentation for.
         :return: The list of file paths is written to.
         """
-        generator = cls(settings)
-        result = generator.generate(*settings_info)
-        file_paths = generator.file_paths()
+        result = self.generate(*settings_info)
+        file_paths = self.file_paths()
         updated_files: list[Path] = []
         for path in file_paths:
             if path.is_file() and path.read_text() == result:
@@ -96,19 +121,34 @@ class AbstractGenerator(ABC):
 
     @staticmethod
     @final
-    def create_generator_config_model() -> type[BaseModel]:
+    def generators() -> dict[str, type["AbstractGenerator"]]:
+        """Get all generators.
+
+        :return: The generators (key: generator name, value: generator class).
+        """
+        return {g.name: g for g in AbstractGenerator.ALL_GENERATORS}
+
+    @staticmethod
+    @final
+    def create_generator_config_model(multiple_for_single: bool = False) -> type[BaseModel]:
         """Create the generator config model.
 
         This model contains all the generators' configuration information.
         The attribute is the generator name, the value is generator config.
+
+        :param multiple_for_single: Whether to create a list of the generator config for the single generator.
         :return: The generator model.
         """
+
+        def _make_arg(generator: type[AbstractGenerator]) -> tuple[Any, Any]:
+            if multiple_for_single:
+                return list[generator.config], Field(default_factory=lambda: [generator.config()])
+            return generator.config, Field(default_factory=generator.config)
+
+        fields = {name: _make_arg(generator) for name, generator in AbstractGenerator.generators().items()}
         return create_model(
             "Generators",
-            **{
-                generator.name: (generator.config, Field(default_factory=generator.config))
-                for generator in AbstractGenerator.ALL_GENERATORS
-            },
+            **fields,
             __base__=BaseModel,
             __doc__="The configuration of generators.",
         )

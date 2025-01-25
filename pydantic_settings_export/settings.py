@@ -1,14 +1,9 @@
-import warnings
 from pathlib import Path
-from typing import Any
 
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field, SkipValidation, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field
+from pydantic_settings import SettingsConfigDict
 
-from pydantic_settings_export.generators import AbstractGenerator, Generators
 from pydantic_settings_export.sources import TomlSettings
-from pydantic_settings_export.utils import import_settings_from_string
 
 __all__ = (
     "RelativeToSettings",
@@ -59,62 +54,3 @@ class PSESettings(TomlSettings):
         description="The relative directory settings.",
     )
     respect_exclude: bool = Field(True, description="Respect the exclude attribute in the fields.")
-
-    generators: Generators = Field(
-        default_factory=Generators,
-        description="The configuration of generators.",
-    )
-
-    generators_list: list[SkipValidation[type["AbstractGenerator"]]] = Field(
-        default_factory=list,
-        description="The list of generators to use.",
-        exclude=True,
-    )
-
-    env_file: Path | None = Field(
-        None,
-        description=(
-            "The path to the `.env` file to load environment variables. "
-            "Useful, then you have a Settings class/instance, which require values while running."
-        ),
-    )
-
-    @property
-    def settings(self) -> list[BaseSettings]:
-        """Get the settings."""
-        return [import_settings_from_string(i) for i in self.default_settings or []]
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_generators(cls, data: Any) -> Any:
-        """Validate the generators."""
-        if isinstance(data, dict):
-            generators = data.setdefault("generators", {})
-
-            for generator in AbstractGenerator.ALL_GENERATORS:
-                config = data.pop(generator.name, None)
-                if config:
-                    warnings.warn(
-                        f"You use the old-style to set generator {generator.name} config. "
-                        f"Please, use the new-style:\n"
-                        f"- For toml file: `[tool.pydantic_settings_export.generators.{generator.name}]`\n"
-                        f"- For ENV: `PYDANTIC_SETTINGS_EXPORT__GENERATORS__{generator.name.upper()}__`\n"
-                        f"The old-style will be removed in the future!",
-                        DeprecationWarning,
-                        stacklevel=2,
-                    )
-                    generators[generator.name] = config
-        return data
-
-    @model_validator(mode="before")
-    @classmethod
-    def validate_env_file(cls, data: Any) -> Any:
-        """Validate the env file."""
-        if isinstance(data, dict):
-            file = data.get("env_file")
-            if file is not None:
-                f = Path(file)
-                if f.is_file():
-                    print("Loading env file", f)
-                    load_dotenv(file)
-        return data

@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-license = {file = "LICENCE"}
+license = { file = "LICENCE" }
 repository = "https://github.com/jag-k/pydantic-settings-export"
 homepage = "https://github.com/jag-k/pydantic-settings-export#readme"
 packages = [
@@ -109,6 +109,10 @@ ignore = [
     'F403', # from {name} import * used; unable to detect undefined names
     'F405', # {name} may be undefined, or defined from star imports
 ]
+'tests/**/*.py' = [
+    'D', # Docstring Errors
+    'S101', # Use of assert detected
+]
 
 # https://docs.astral.sh/ruff/settings/#lintpydocstyle
 [tool.ruff.lint.pydocstyle]
@@ -161,16 +165,28 @@ enable_incomplete_feature = ["NewGenericSyntax"]
 [tool.pydantic_settings_export]
 project_dir = "."
 default_settings = [
-    "pydantic_settings_export.settings:PSESettings",
+    "pydantic_settings_export.cli:PSECLISettings",
 ]
 env_file = ".env"
 
-[tool.pydantic_settings_export.generators.dotenv]
-name = ".env.example"
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [".env.example"]
 
-[tool.pydantic_settings_export.generators.markdown]
-name = "Configuration.md"
-save_dirs = [
-    "docs",
-    "wiki",
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [".env.only-optional.example"]
+mode = "only-optional"
+split_by_group = false
+add_examples = false
+
+[[tool.pydantic_settings_export.generators.markdown]]
+paths = [
+    "docs/Configuration.md",
+    "wiki/Configuration.md",
+]
+
+[[tool.pydantic_settings_export.generators.markdown]]
+table_only = true
+file_prefix = "Simple Configuration. Just a table."
+paths = [
+    "docs/SimpleConfiguration.md",
 ]

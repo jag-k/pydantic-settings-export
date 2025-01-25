@@ -1,7 +1,10 @@
 # pydantic-settings-export
 
-[![PyPI version](https://img.shields.io/pypi/v/pydantic-settings-export?logo=pypi&label=pydantic-settings-export)](https://pypi.org/project/pydantic-settings-export/)
-![Pepy Total Downloads](https://img.shields.io/pepy/dt/pydantic-settings-export)
+[![PyPI - Project version](https://img.shields.io/pypi/v/pydantic-settings-export?logo=pypi)](https://pypi.org/p/pydantic-settings-export/)
+[![PyPI - Downloads](https://img.shields.io/pypi/dm/pydantic-settings-export)](https://pypi.org/p/pydantic-settings-export/)
+[![Pepy - Total Downloads](https://img.shields.io/pepy/dt/pydantic-settings-export)](https://pypi.org/p/pydantic-settings-export/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pydantic-settings-export)](https://pypi.org/project/pydantic-settings-export/)
+[![PyPI - License](https://img.shields.io/pypi/l/pydantic-settings-export)](https://github.com/jag-k/pydantic-settings-export/blob/main/LICENSE)
 
 *Export your Pydantic settings to Markdown and .env.example files!*
 
@@ -23,10 +26,12 @@ You can see the usage examples of this package in the [./docs/Configuration.md](
 
 ### As code
 
+This project is not well-designed for using as a library. But you still can use it as a code.
+
 ```python
 from pydantic import BaseSettings
 
-from pydantic_settings_export import Exporter, Generators, PSESettings
+from pydantic_settings_export import Exporter, PSESettings
 from pydantic_settings_export.generators import MarkdownGenerator
 
 
@@ -35,37 +40,28 @@ class Settings(BaseSettings):
   another_setting: int = 42
 
 
-# Export the settings to a Markdown file `docs/Configuration.md` and `.env.example` file
+# Export the settings to a Markdown file `docs/Configuration.md`
+pse_settings = PSESettings()
 Exporter(
-  PSESettings(
-    generators=Generators(
-      markdown=MarkdownGenerator.config(
-        save_dirs=["docs"],
-      ),
-    )
-  ),
-).run_all(Settings)
-
-# OR
-
-Exporter(
-  PSESettings.model_validate(
-    {
-      "generators": {
-        "markdown": {
-          "save_dirs": ["docs"],
-        },
-      },
-    },
-  ),
+    pse_settings,
+    generators=[
+        MarkdownGenerator(
+            pse_settings,
+            MarkdownGenerator.config(
+                save_dirs=["docs"],
+            ),
+        )
+    ]
 ).run_all(Settings)
 ```
 
 ### As CLI
 
+<!-- region:cli -->
 ```bash
 pydantic-settings-export --help
 ```
+<!-- endregion:cli -->
 
 ## Configuration
 
@@ -79,25 +75,22 @@ default_settings = [
   "pydantic_settings_export.settings:PSESettings",
 ]
 
-[tool.pydantic_settings_export.generators.dotenv]
-name = ".env.example"
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [
+  ".env.example",
+]
 
 [tool.pydantic_settings_export.generators.markdown]
-name = "Configuration.md"
-save_dirs = [
-  "docs",
-  "wiki",
+paths = [
+  "docs/Configuration.md",
+  "wiki/Configuration.md",
 ]
 ```
 
 ## Todo
 
+- [x] Add more configuration options
 - [ ] Add tests
-- [ ] Add more configuration options
-- [ ] Add more output formats
-  - [ ] TOML (and `pyproject.toml`)
-  - [ ] JSON
-  - [ ] YAML
 
 
 ## License
