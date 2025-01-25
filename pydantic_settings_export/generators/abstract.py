@@ -115,6 +115,7 @@ class AbstractGenerator(ABC):
                 # No need to update the file
                 continue
 
+            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(result)
             updated_files.append(path)
         return updated_files

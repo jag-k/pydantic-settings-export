@@ -45,8 +45,13 @@ class MarkdownSettings(BaseGeneratorSettings):
     )
 
     paths: list[Path] = Field(
-        default_factory=lambda: [Path("Configuration.md")],
+        default_factory=list,
         description="The paths to the resulting files.",
+        examples=[
+            Path("Configuration.md"),
+            Path("docs/Configuration.md"),
+            Path("wiki/project_config.md"),
+        ],
     )
 
     file_prefix: str = Field(

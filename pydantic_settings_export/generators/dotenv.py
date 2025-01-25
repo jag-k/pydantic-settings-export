@@ -29,8 +29,12 @@ class DotEnvSettings(BaseGeneratorSettings):
     )
 
     paths: list[Path] = Field(
-        default_factory=lambda: [Path(".env.example")],
+        default_factory=list,
         description="The paths to the resulting files.",
+        examples=[
+            Path(".env.example"),
+            Path(".env.sample"),
+        ],
     )
 
     split_by_group: bool = Field(True, description="Whether to split the environment variables by group (headers).")
