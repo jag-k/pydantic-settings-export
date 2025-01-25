@@ -21,10 +21,13 @@ from pydantic_settings_export.utils import ObjectImportAction, import_settings_f
 from pydantic_settings_export.version import __version__
 
 CDW = Path.cwd()
+PROJECT_NAME: str = "pydantic-settings-export"
+
 
 self_pyproject_file = Path(__file__).resolve().parents[1] / "pyproject.toml"
-with self_pyproject_file.open("rb") as f:
-    PROJECT_NAME: str = load(f).get("project", {}).get("name", "pydantic-settings-export")
+if self_pyproject_file.is_file():
+    with self_pyproject_file.open("rb") as f:
+        PROJECT_NAME: str = load(f).get("project", {}).get("name", PROJECT_NAME)
 
 Generators = AbstractGenerator.create_generator_config_model(multiple_for_single=True)
 
