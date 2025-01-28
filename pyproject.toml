@@ -28,8 +28,8 @@ packages = [
 ]
 keywords = ["pydantic", "settings", "export", "markdown", "dotenv", "config"]
 dependencies = [
-    "pydantic-settings>=2",
-    "pydantic>=2",
+    "pydantic-settings>=2.3",
+    "pydantic>=2.7",
 ]
 
 [project.urls]
@@ -170,10 +170,16 @@ default_settings = [
 env_file = ".env"
 
 [[tool.pydantic_settings_export.generators.dotenv]]
-paths = [".env.example"]
+paths = [
+    ".env.example",
+    "docs/.env.example",
+]
 
 [[tool.pydantic_settings_export.generators.dotenv]]
-paths = [".env.only-optional.example"]
+paths = [
+    ".env.only-optional.example",
+    "docs/.env.only-optional.example",
+]
 mode = "only-optional"
 split_by_group = false
 add_examples = false
