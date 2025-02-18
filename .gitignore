@@ -151,3 +151,4 @@ mongo/
 
 # Hatch version control from https://github.com/ofek/hatch-vcs
 pydantic_settings_export/version.py
+.aider*

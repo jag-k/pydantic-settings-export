@@ -11,6 +11,13 @@ from .abstract import AbstractGenerator, BaseGeneratorSettings
 __all__ = ("DotEnvGenerator",)
 
 DotEnvMode = Literal["all", "only-optional", "only-required"]
+# Map from DotEnvMode to (is_optional, is_required)
+DOTENV_MODE_MAP: dict[DotEnvMode, tuple[bool, bool]] = {
+    "all": (True, True),
+    "only-optional": (True, False),
+    "only-required": (False, True),
+}
+DOTENV_MODE_MAP_DEFAULT = DOTENV_MODE_MAP["all"]
 
 
 class DotEnvSettings(BaseGeneratorSettings):
@@ -67,16 +74,18 @@ class DotEnvGenerator(AbstractGenerator):
     def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
         """Generate a .env example for a pydantic settings class.
 
-        :param level: The level of nesting. Used for indentation.
-        :param settings_info: The settings class to generate a .env example for.
-        :return: The generated .env example.
+        Creates a formatted .env file with:
+        - Optional/required variables clearly marked
+        - Grouped settings with headers
+        - Example values as comments
+        - Proper environment variable naming
+
+        :param settings_info: The settings class to generate examples for.
+        :param level: The level of nesting for proper formatting.
+        :return: Formatted .env content with variables and documentation.
         """
         result = ""
-        is_optional, is_required = {
-            "all": (True, True),
-            "only-optional": (True, False),
-            "only-required": (False, True),
-        }.get(self.generator_config.mode, (True, True))
+        is_optional, is_required = DOTENV_MODE_MAP.get(self.generator_config.mode, DOTENV_MODE_MAP_DEFAULT)
 
         if self.generator_config.split_by_group:
             result = f"### {settings_info.name}\n\n"

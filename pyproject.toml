@@ -1,7 +1,7 @@
 [project]
 name = "pydantic-settings-export"
 dynamic = ["version"]
-description = "Export your Pydantic settings to a Markdown and .env.example files!"
+description = "Export your Pydantic settings to documentation with ease!"
 readme = "README.md"
 authors = [
     { name = "Jag_k", email = "30597878+jag-k@users.noreply.github.com" }
@@ -178,14 +178,12 @@ env_file = ".env"
 
 [[tool.pydantic_settings_export.generators.dotenv]]
 paths = [
-    ".env.example",
-    "docs/.env.example",
+    "examples/.env.example",
 ]
 
 [[tool.pydantic_settings_export.generators.dotenv]]
 paths = [
-    ".env.only-optional.example",
-    "docs/.env.only-optional.example",
+    "examples/.env.only-optional.example",
 ]
 mode = "only-optional"
 split_by_group = false
@@ -193,7 +191,7 @@ add_examples = false
 
 [[tool.pydantic_settings_export.generators.markdown]]
 paths = [
-    "docs/Configuration.md",
+    "examples/Configuration.md",
     "wiki/Configuration.md",
 ]
 
@@ -201,7 +199,7 @@ paths = [
 table_only = true
 file_prefix = "Simple Configuration. Just a table."
 paths = [
-    "docs/SimpleConfiguration.md",
+    "examples/SimpleConfiguration.md",
 ]
 
 [[tool.pydantic_settings_export.generators.markdown]]
@@ -209,5 +207,5 @@ table_only = true
 file_prefix = "Injected Configuration. Just a table."
 region = "config"
 paths = [
-    "docs/InjectedConfiguration.md",
+    "examples/InjectedConfiguration.md",
 ]

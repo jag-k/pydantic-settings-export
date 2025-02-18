@@ -2,7 +2,7 @@ import importlib.util
 import warnings
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, Self, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -10,6 +10,9 @@ from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
 from .abstract import AbstractGenerator, BaseGeneratorSettings
+
+if TYPE_CHECKING:
+    from text_region_parser import RegionConstructor
 
 __all__ = ("MarkdownGenerator",)
 
@@ -172,12 +175,49 @@ class MarkdownGenerator(AbstractGenerator):
     def _make_table(self, rows: list[TableRowDict]) -> str:
         return make_pretty_md_table_from_dict(rows, headers=[h.value for h in self.generator_config.table_headers])
 
+    def _process_region(self, path: Path, content: str, constructor: "RegionConstructor") -> bool:
+        """Process a single region in a file.
+
+        :param path: Path to the file
+        :param content: Content to insert
+        :param constructor: Region constructor instance
+        :return: True if a file was updated, False otherwise
+        :raises FileNotFoundError: If the file doesn't exist
+        :raises IOError: If there are issues reading/writing the file
+        """
+        try:
+            if not path.is_file():
+                raise FileNotFoundError(
+                    f"The file {path} does not exist. "
+                    f"Please create this file before running the generator with the `region` option."
+                )
+
+            file_content = path.read_text()
+            new_content = constructor.parse_content(file_content)
+
+            if new_content == file_content:
+                return False
+
+            path.write_text(new_content)
+            return True
+
+        except OSError as e:
+            raise OSError(f"Failed to process region in {path}: {e}") from e
+
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:  # noqa: C901
         """Generate Markdown documentation for a pydantic settings class.
 
-        :param settings_info: The settings class to generate documentation for.
-        :param level: The level of nesting. Used for indentation.
-        :return: The generated documentation.
+        Creates formatted Markdown with:
+        - Nested headers for settings hierarchy
+        - Tables for settings documentation
+        - Environment variable information
+        - Type annotations and defaults
+        - Optional examples and deprecation notices
+
+
+        :param settings_info: Settings model to document.
+        :param level: Header nesting level (h1, h2, etc).
+        :return: Formatted Markdown documentation.
         """
         # Generate header
         result = ""
@@ -250,18 +290,10 @@ class MarkdownGenerator(AbstractGenerator):
 
         updated_files: list[Path] = []
         for path in file_paths:
-            if not path.is_file():
-                raise FileNotFoundError(
-                    f"The file {path} does not exist. "
-                    f"Please, create this file before running the generator with the `region` option."
-                )
-
-            file_content = path.read_text()
-            new_content = constructor.parse_content(file_content)
-            if new_content == file_content:
-                # No need to update the file
-                continue
-            path.write_text(new_content)
-            updated_files.append(path)
+            try:
+                if self._process_region(path, result, constructor):
+                    updated_files.append(path)
+            except (OSError, FileNotFoundError) as e:
+                warnings.warn(str(e), stacklevel=2)
 
         return updated_files
