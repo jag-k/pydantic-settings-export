@@ -138,10 +138,10 @@ local.*
 .fleet/
 .vscode/
 tests/code_coverage/
-__pycache__/
+**/__pycache__/
 */tmp.py
 wiki/
-pyrightconig.json
+pyrightconfig.json
 .python_version
 
 
