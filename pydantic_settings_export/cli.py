@@ -50,7 +50,7 @@ class PSECLISettings(PSESettings):
     env_file: Path | None = Field(
         None,
         description=(
-            "he path to the .env file to load environment variables. "
+            "The path to the .env file to load environment variables. "
             "Useful when you have a Settings class/instance, which requires values while running."
         ),
     )
@@ -274,6 +274,9 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     parser = make_parser()
     args: argparse.Namespace = parser.parse_args(parse_args)
     for env_file in args.env_file:
+        if not Path(env_file.name).exists():
+            warnings.warn(f"Environment file {env_file.name} does not exist", stacklevel=2)
+            continue
         os.environ.update(dotenv_values(stream=env_file))
 
     if args.config_file:
@@ -294,7 +297,12 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     if not settings:
         parser.exit(1, parser.format_help())
 
-    result = Exporter(s, s.get_generators()).run_all(*settings)
+    try:
+        exporter = Exporter(s, s.get_generators())
+        result = exporter.run_all(*settings)
+    except Exception as e:
+        parser.exit(1, f"Failed to initialize exporter: {e}\n")
+
     if result:
         files = "\n".join(f"- {r}" for r in result)
         parser.exit(0, f"Generated files ({len(result)}): \n{files}\n")

@@ -5,16 +5,27 @@ This document provides guidelines and instructions for contributing.
 
 ## Development Setup
 
-1. **Clone the repository**
+1. **Install `uv` for development**
+   ```bash
+   # On macOS and Linux.
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # On Windows.
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+
+   More info about installing `uv` can be found [here](https://github.com/astral-sh/uv#installation).
+
+2. **Clone the repository**
    ```bash
    git clone https://github.com/jag-k/pydantic-settings-export.git
    cd pydantic-settings-export
    ```
 
-2. **Set up a development environment**
+3. **Set up a development environment**
    ```bash
-   # Using pip
-   pip install -e ".[dev,tests]"
+   # Using uv
+   uv sync --all-extras
 
    # Install pre-commit hooks
    pre-commit install
@@ -83,7 +94,8 @@ Add new tests in the `tests/` directory, following existing patterns.
 ## Release Process
 
 The release process is only made by maintainers:
- - [@jag-k](https://github.com/jag-k)
+
+  - Project owner: [@jag-k](https://github.com/jag-k)
 
 1. Create a new git tag by running `git tag -a v1.0.0 -m "Release v1.0.0"`
 2. CI will automatically publish to PyPI and create a GitHub release

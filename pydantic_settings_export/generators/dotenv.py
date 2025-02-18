@@ -10,7 +10,13 @@ from .abstract import AbstractGenerator, BaseGeneratorSettings
 
 __all__ = ("DotEnvGenerator",)
 
+# Defines the mode for .env file generation.
+# Options:
+#     - "all": Include both optional and required variables
+#     - "only-optional": Include only optional variables
+#     - "only-required": Include only required variables
 DotEnvMode = Literal["all", "only-optional", "only-required"]
+
 # Map from DotEnvMode to (is_optional, is_required)
 DOTENV_MODE_MAP: dict[DotEnvMode, tuple[bool, bool]] = {
     "all": (True, True),
@@ -56,7 +62,9 @@ class DotEnvSettings(BaseGeneratorSettings):
         """Validate the paths."""
         if self.name:
             warnings.warn(
-                "The `name` attribute is deprecated and will be removed in the future. Use `paths` instead.",
+                "The `name` attribute is deprecated and will be removed in a future version. "
+                "Please migrate to using `paths: list[Path]` instead. "
+                "Example: paths=[Path('.env.example')] or `paths=['.env.example']` (for `pyproject.toml`).",
                 DeprecationWarning,
                 stacklevel=1,
             )
@@ -71,7 +79,7 @@ class DotEnvGenerator(AbstractGenerator):
     config = DotEnvSettings
     generator_config: DotEnvSettings
 
-    def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
+    def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:  # noqa: C901
         """Generate a .env example for a pydantic settings class.
 
         Creates a formatted .env file with:
@@ -87,6 +95,7 @@ class DotEnvGenerator(AbstractGenerator):
         result = ""
         is_optional, is_required = DOTENV_MODE_MAP.get(self.generator_config.mode, DOTENV_MODE_MAP_DEFAULT)
 
+        has_content = False
         if self.generator_config.split_by_group:
             result = f"### {settings_info.name}\n\n"
 
@@ -106,6 +115,7 @@ class DotEnvGenerator(AbstractGenerator):
                 field_string += "  # " + (", ".join(field.examples))
 
             result += field_string + "\n"
+            has_content = True
 
         result = result.strip() + "\n"
         if self.generator_config.split_by_group:
@@ -113,5 +123,16 @@ class DotEnvGenerator(AbstractGenerator):
 
         for child in settings_info.child_settings:
             result += self.generate_single(child)
+            child_result = self.generate_single(child)
+            if child_result.strip():
+                result += child_result
+                has_content = True
+
+        if not has_content:
+            warnings.warn(
+                f"# No {'optional' if is_optional else 'required'} environment variables found "
+                f"for {settings_info.name}",
+                stacklevel=2,
+            )
 
         return result

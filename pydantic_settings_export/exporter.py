@@ -37,10 +37,14 @@ class Exporter:
         settings_infos: list[SettingsInfoModel] = [
             SettingsInfoModel.from_settings_model(s, self.settings) for s in settings
         ]
+        paths: list[Path] = []
 
-        return [
-            # Run all generators for each setting info
-            path
-            for generator in self.generators
-            for path in generator.run(*settings_infos)
-        ]
+        for generator in self.generators:
+            try:
+                # Run all generators for each setting info
+                paths.extend(generator.run(*settings_infos))
+            except Exception as e:
+                warnings.warn(f"Generator {generator.__class__.__name__} failed: {e}", stacklevel=2)
+            continue
+
+        return paths
