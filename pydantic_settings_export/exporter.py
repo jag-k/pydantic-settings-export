@@ -18,6 +18,8 @@ class Exporter:
         generators: list[AbstractGenerator] | None = None,
     ) -> None:
         self.settings: PSESettings = settings or PSESettings()
+        if generators is None:
+            generators = [g(self.settings) for g in AbstractGenerator.ALL_GENERATORS]
         self.generators: list[AbstractGenerator] = generators
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:

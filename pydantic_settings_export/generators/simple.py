@@ -21,20 +21,33 @@ class SimpleGenerator(AbstractGenerator):
     generator_config: SimpleSettings
 
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:  # noqa: C901
-        """Generate Markdown documentation for a pydantic settings class.
+        """Generate simple text documentation for settings.
 
-        :param settings_info: The settings class to generate documentation for.
-        :param level: The level of nesting. Used for indentation.
-        :return: The generated documentation.
+        Produces a clean, readable text format with:
+        - Section headers with underlines
+        - Field descriptions and types
+        - Default values and examples
+        - Proper spacing and indentation
+
+        :param settings_info: Settings model to document.
+        :param level: Nesting level for indentation.
+        :return: Formatted text documentation with consistent styling.
         """
+        indent = "  " * (level - 1)
         docs = settings_info.docs.rstrip()
 
-        # Generate header
+        # Generate section header
         name = settings_info.name
-        hash_len = len(name)
-        result = f"{name}\n{'#' * hash_len}\n"
+        header_line = "=" * len(name)
+        result = f"{indent}{name}\n{indent}{header_line}\n"
+
+        # Add environment prefix if present
+        if settings_info.env_prefix:
+            result += f"\n{indent}Environment Prefix: {settings_info.env_prefix}\n"
+
+        # Add documentation if present
         if docs:
-            result += f"\n{docs}\n"
+            result += f"\n{indent}{docs}\n"
 
         for field in settings_info.fields:
             field_name = f"`{field.full_name}`"

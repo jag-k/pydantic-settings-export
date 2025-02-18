@@ -167,19 +167,23 @@ def file_type(path: str) -> Path:
 
 
 def make_parser() -> argparse.ArgumentParser:
-    """
-    Creates and configures an argparse.ArgumentParser instance for the CLI tool.
+    """Create and configure the CLI argument parser.
 
-    The parser is designed to handle several command-line arguments for exporting
-    pydantic settings to a file, as well as manage configuration options. It includes
-    customized help, versioning, and configuration settings for enhanced functionality.
+    This function sets up a comprehensive CLI interface that supports:
+    - Multiple output formats (markdown, dotenv, etc)
+    - Custom generator plugins
+    - Environment variable loading
+    - Project-specific configuration
 
-    :return: An instance of argparse.ArgumentParser fully configured for the CLI tool.
-    :rtype: argparse.ArgumentParser
+    Example usage:
+        pydantic-settings-export app.settings:Settings
+        pydantic-settings-export --generator markdown --output docs/settings.md app.settings:Settings
+        pydantic-settings-export --env-file .env.dev app.settings:Settings
 
-    :raises ValueError: Raised by dir_type or file_type if invalid values are provided
-                        for the `--project-dir` or `--config-file` options.
-    :raises FileNotFoundError: Raised if a specified file (e.g., `.env` file) does not exist.
+    :return: Configured parser instance.
+    :raises ValueError: If invalid directory/file paths are provided.
+    :raises FileNotFoundError: If specified files don't exist.
+    :raises ImportError: If custom generators/settings can't be imported.
     """
     parser = argparse.ArgumentParser(
         prog=PROJECT_NAME,

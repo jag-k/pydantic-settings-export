@@ -70,7 +70,7 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+examples/_build/
 
 # PyBuilder
 .pybuilder/
@@ -151,3 +151,4 @@ mongo/
 
 # Hatch version control from https://github.com/ofek/hatch-vcs
 pydantic_settings_export/version.py
+.aider*

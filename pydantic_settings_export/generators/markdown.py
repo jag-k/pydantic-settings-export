@@ -175,9 +175,17 @@ class MarkdownGenerator(AbstractGenerator):
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:  # noqa: C901
         """Generate Markdown documentation for a pydantic settings class.
 
-        :param settings_info: The settings class to generate documentation for.
-        :param level: The level of nesting. Used for indentation.
-        :return: The generated documentation.
+        Creates formatted Markdown with:
+        - Nested headers for settings hierarchy
+        - Tables for settings documentation
+        - Environment variable information
+        - Type annotations and defaults
+        - Optional examples and deprecation notices
+
+
+        :param settings_info: Settings model to document.
+        :param level: Header nesting level (h1, h2, etc).
+        :return: Formatted Markdown documentation.
         """
         # Generate header
         result = ""
