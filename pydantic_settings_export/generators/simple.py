@@ -6,6 +6,9 @@ from .abstract import AbstractGenerator, BaseGeneratorSettings
 
 __all__ = ("SimpleGenerator",)
 
+INDENT_CHAR = "  "
+HEADER_UNDERLINE_CHAR = "="
+
 
 class SimpleSettings(BaseGeneratorSettings):
     """Settings for the simple generator."""
@@ -33,12 +36,12 @@ class SimpleGenerator(AbstractGenerator):
         :param level: Nesting level for indentation.
         :return: Formatted text documentation with consistent styling.
         """
-        indent = "  " * (level - 1)
+        indent = INDENT_CHAR * (level - 1)
         docs = settings_info.docs.rstrip()
 
         # Generate section header
         name = settings_info.name
-        header_line = "=" * len(name)
+        header_line = HEADER_UNDERLINE_CHAR * len(name)
         result = f"{indent}{name}\n{indent}{header_line}\n"
 
         # Add environment prefix if present

@@ -103,7 +103,7 @@ uv tool install pydantic-settings-export
 
 ## Usage
 
-The recommended way to use this package is through its CLI interface or as a [pre-commit] hook.
+The recommended way to use this package is through its CLI or as a [pre-commit] hook.
 
 ### CLI Usage
 
@@ -260,14 +260,14 @@ This project solves these problems by:
 
 ## Development Context
 
-This is a personal pet project maintained in free time. Development priorities are:
+This is a personal pet project maintained in my spare time. The development priorities are:
 
 1. Bug fixes
 2. Features from Roadmap:
-    - Issues with closest milestone
-    - General milestone issues
-    - Issues labeled `bug` or `feature request`
-    - Features listed in this README
+    - Issues with closest milestone.
+    - General milestone issues.
+    - Issues labeled `bug` or `feature request`.
+    - Features listed in this README.
 3. New feature proposals
 
 > Note: While we strive for quality and responsiveness, resolution timelines can't be guaranteed.
@@ -288,9 +288,9 @@ We welcome contributions! Before contributing:
 1. Create a GitHub Issue first — this is **required**
 2. Fork the repository
 3. Create a branch following our naming convention:
-    - Format: `<domain>/<issue-number>-<short-description>`
-    - Example: `feature/6-inject-config-to-markdown`
-    - Domains: `fix/` or `feature/`
+    - Format: `<domain>/<issue-number>-<short-description>`.
+    - Domains: `fix` or `feature`.
+    - Example: `feature/6-inject-config-to-markdown`.
 4. Make your changes
 5. Submit a PR with changelog in description
 
@@ -315,7 +315,6 @@ For complete guidelines, see our:
 
 [MIT][license]
 
-[pydantic-settings-export]: https://github.com/jag-k/pydantic-settings-export
 
 [pypi]: https://pypi.org/project/pydantic-settings-export/
 

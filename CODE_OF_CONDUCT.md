@@ -2,7 +2,7 @@
 
 ## Project Context
 
-This is a personal pet project developed and maintained in free time.
+This is a personal project developed and maintained during personal time.
 While we strive for quality and responsiveness, specific resolution timelines can't be guaranteed.
 
 ## Communication & Contributions
@@ -27,7 +27,7 @@ Only after creating an issue, contributors may use:
 
 1. Bug fixes
 2. Features from Roadmap:
-   - Issues with closest milestone
+   - Issues with the closest milestone
    - General milestone issues
    - General issues with label `bug` or `feature request`
    - Features listed in README.md

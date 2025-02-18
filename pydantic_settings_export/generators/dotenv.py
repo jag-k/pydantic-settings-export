@@ -11,6 +11,13 @@ from .abstract import AbstractGenerator, BaseGeneratorSettings
 __all__ = ("DotEnvGenerator",)
 
 DotEnvMode = Literal["all", "only-optional", "only-required"]
+# Map from DotEnvMode to (is_optional, is_required)
+DOTENV_MODE_MAP: dict[DotEnvMode, tuple[bool, bool]] = {
+    "all": (True, True),
+    "only-optional": (True, False),
+    "only-required": (False, True),
+}
+DOTENV_MODE_MAP_DEFAULT = DOTENV_MODE_MAP["all"]
 
 
 class DotEnvSettings(BaseGeneratorSettings):
@@ -78,11 +85,7 @@ class DotEnvGenerator(AbstractGenerator):
         :return: Formatted .env content with variables and documentation.
         """
         result = ""
-        is_optional, is_required = {
-            "all": (True, True),
-            "only-optional": (True, False),
-            "only-required": (False, True),
-        }.get(self.generator_config.mode, (True, True))
+        is_optional, is_required = DOTENV_MODE_MAP.get(self.generator_config.mode, DOTENV_MODE_MAP_DEFAULT)
 
         if self.generator_config.split_by_group:
             result = f"### {settings_info.name}\n\n"

@@ -72,19 +72,21 @@ Run tests with pytest:
 pytest
 ```
 
-Add new tests in the `tests/` directory following existing patterns.
+Add new tests in the `tests/` directory, following existing patterns.
 
 ## Documentation
 
-- Update relevant documentation in `wiki/`
+- Update relevant documentation to [GitHub Wiki](https://github.com/jag-k/pydantic-settings-export/wiki)
 - Keep docstrings up to date
 - Add examples for new features
 
 ## Release Process
 
-1. Update version in `pyproject.toml`
-2. Create a new git tag
-3. CI will automatically publish to PyPI and create a GitHub release
+The release process is only made by maintainers:
+ - [@jag-k](https://github.com/jag-k)
+
+1. Create a new git tag by running `git tag -a v1.0.0 -m "Release v1.0.0"`
+2. CI will automatically publish to PyPI and create a GitHub release
 
 ## Getting Help
 

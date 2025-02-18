@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -19,7 +20,12 @@ class Exporter:
     ) -> None:
         self.settings: PSESettings = settings or PSESettings()
         if generators is None:
-            generators = [g(self.settings) for g in AbstractGenerator.ALL_GENERATORS]
+            generators = []
+            for generator_class in AbstractGenerator.ALL_GENERATORS:
+                try:
+                    generators.append(generator_class(self.settings))
+                except Exception as e:
+                    warnings.warn(f"Failed to initialize generator {generator_class.__name__}: {e}", stacklevel=2)
         self.generators: list[AbstractGenerator] = generators
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
