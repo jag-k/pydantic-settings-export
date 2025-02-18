@@ -89,8 +89,10 @@ class MarkdownSettings(BaseGeneratorSettings):
         False,
         description=(
             "The region to use for the table of the ALL settings (including sub-settings).\n"
-            "If `True`, will be generated with the header of top-level settings.\n\n"
-            "NOTE: This option is only available if the `regions` extra is installed."
+            "If a string is provided, the generator will insert content into that named region.\n"
+            "It replace all regions with the same to the same content.\n\n"
+            "NOTE: This option is only available if the `regions` extra is installed.\n"
+            'NOTE: For now, you cannot be able to control regions with the "region header option".'
         ),
         examples=[False, "config"],
     )

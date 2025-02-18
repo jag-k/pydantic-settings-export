@@ -51,7 +51,7 @@ class PSECLISettings(PSESettings):
         None,
         description=(
             "The path to the `.env` file to load environment variables. "
-            "Useful, then you have a Settings class/instance, which require values while running."
+            "Useful then you have a Settings class/instance, which require values while running."
         ),
     )
 
