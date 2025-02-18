@@ -175,11 +175,11 @@ class MarkdownGenerator(AbstractGenerator):
     def _make_table(self, rows: list[TableRowDict]) -> str:
         return make_pretty_md_table_from_dict(rows, headers=[h.value for h in self.generator_config.table_headers])
 
-    def _process_region(self, path: Path, content: str, constructor: "RegionConstructor") -> bool:
+    @staticmethod
+    def _process_region(path: Path, constructor: "RegionConstructor") -> bool:
         """Process a single region in a file.
 
         :param path: Path to the file
-        :param content: Content to insert
         :param constructor: Region constructor instance
         :return: True if a file was updated, False otherwise
         :raises FileNotFoundError: If the file doesn't exist
@@ -291,7 +291,7 @@ class MarkdownGenerator(AbstractGenerator):
         updated_files: list[Path] = []
         for path in file_paths:
             try:
-                if self._process_region(path, result, constructor):
+                if self._process_region(path, constructor):
                     updated_files.append(path)
             except (OSError, FileNotFoundError) as e:
                 warnings.warn(str(e), stacklevel=2)
