@@ -45,20 +45,22 @@ Create Markdown docs, `.env.example` files, and more with minimal configuration.
 - pydantic >= 2.7
 - pydantic-settings >= 2.3
 
-Optional dependencies:
+Optional dependencies (aka `extras`):
 
-- `email-validator >= 2.2.0` (for email validation)
-- `text-region-parser >= 0.1.1` (for Markdown region insertion)
+- `email` -- for email validation support (`email-validator >= 2.2.0`).
+  - Required for `pydantic.EmailStr` type.
+- `regions` -- for Markdown region insertion support (`text-region-parser >= 0.1.1`).
+  - Required for Markdown generator with `region` option.
 
 Install with optional dependencies:
 
 ```bash
 # Install with all optional dependencies
-pip install "pydantic-settings-export[email,regions]"
+pip install "pydantic-settings-export[email,regions]"  # Install with all extras
 
 # Install with specific optional dependency
-pip install "pydantic-settings-export[email]"
-pip install "pydantic-settings-export[regions]"
+pip install "pydantic-settings-export[email]"  # Install with email extra
+pip install "pydantic-settings-export[regions]"  # Install with regions extra
 ```
 
 ## 🚀 Quick Start
