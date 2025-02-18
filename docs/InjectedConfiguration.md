@@ -1,4 +1,11 @@
-Simple Configuration. Just a table.
+# Example of injected configuration
+
+After running the generation, all content which is between the `<!-- region:region_name -->` and `<!-- endregion:region_name -->` will be replaced with the generated configuration.
+
+Here is an example of injected configuration with region name `config`:
+
+<!-- region:config -->
+Injected Configuration. Just a table.
 
 | Name                                                       | Type                 | Default           | Description                                                                                                                                  | Example                                                                                        |
 |------------------------------------------------------------|----------------------|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
@@ -9,3 +16,4 @@ Simple Configuration. Just a table.
 | `PYDANTIC_SETTINGS_EXPORT__ENV_FILE`                       | `Path` \| `NoneType` | `null`            | he path to the .env file to load environment variables. Useful when you have a Settings class/instance, which requires values while running. | `null`                                                                                         |
 | `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__REPLACE_ABS_PATHS` | `boolean`            | `true`            | Replace absolute paths with relative path to project root.                                                                                   | `true`                                                                                         |
 | `PYDANTIC_SETTINGS_EXPORT__RELATIVE_TO__ALIAS`             | `string`             | `"<project_dir>"` | The alias for the relative directory.                                                                                                        | `"<project_dir>"`                                                                              |
+<!-- endregion:config -->

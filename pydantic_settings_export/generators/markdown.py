@@ -1,7 +1,8 @@
+import importlib.util
 import warnings
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, Self, TypedDict
+from typing import Literal, Self, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -84,6 +85,18 @@ class MarkdownSettings(BaseGeneratorSettings):
         examples=[True, False, "with-header"],
     )
 
+    region: str | Literal[False] = Field(
+        False,
+        description=(
+            "The region to use for the table of the ALL settings (including sub-settings).\n"
+            "If a string is provided, the generator will insert content into that named region.\n"
+            "It replace all regions with the same to the same content.\n\n"
+            "NOTE: This option is only available if the `regions` extra is installed.\n"
+            'NOTE: For now, you cannot be able to control regions with the "region header option".'
+        ),
+        examples=[False, "config"],
+    )
+
     @model_validator(mode="after")
     def validate_paths(self) -> Self:
         """Validate the paths."""
@@ -98,6 +111,15 @@ class MarkdownSettings(BaseGeneratorSettings):
             )
             self.paths = [path / self.name for path in self.save_dirs]
         self.paths = [p.absolute().resolve() for p in self.paths]
+        return self
+
+    @model_validator(mode="after")
+    def validate_region(self) -> Self:
+        """Validate the region."""
+        if self.region:
+            spec = importlib.util.find_spec("text_region_parser")
+            if not spec or not spec.loader:
+                raise ValueError("The `region` option is only available if the `regions` extra is installed.")
         return self
 
     def __bool__(self) -> bool:
@@ -203,3 +225,43 @@ class MarkdownGenerator(AbstractGenerator):
         else:
             content += "\n\n".join(self.generate_single(s, 2).strip() for s in settings_infos)
         return content.strip() + "\n"
+
+    def run(self, *settings_info: SettingsInfoModel) -> list[Path]:
+        """Run the generator.
+
+        :param settings_info: The settings info to generate documentation for.
+        :return: The paths to generated documentation.
+        """
+        # If the region is not set, run the generator as usual
+        region = self.generator_config.region
+        if not region:
+            return super().run(*settings_info)
+
+        import text_region_parser
+
+        result = f"\n{self.generate(*settings_info).strip()}\n"
+        file_paths = self.file_paths()
+
+        constructor = text_region_parser.RegionConstructor()
+
+        # Add the region with name from the config
+        # This region will be replaced with the generated content
+        constructor.add_parser(cast(str, region))(lambda _: result)
+
+        updated_files: list[Path] = []
+        for path in file_paths:
+            if not path.is_file():
+                raise FileNotFoundError(
+                    f"The file {path} does not exist. "
+                    f"Please, create this file before running the generator with the `region` option."
+                )
+
+            file_content = path.read_text()
+            new_content = constructor.parse_content(file_content)
+            if new_content == file_content:
+                # No need to update the file
+                continue
+            path.write_text(new_content)
+            updated_files.append(path)
+
+        return updated_files

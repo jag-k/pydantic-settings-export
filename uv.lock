@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.11"
 
 [[package]]
@@ -38,6 +39,28 @@ wheels = [
 ]
 
 [[package]]
+name = "dnspython"
+version = "2.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/4a/263763cb2ba3816dd94b08ad3a33d5fdae34ecb856678773cc40a3605829/dnspython-2.7.0.tar.gz", hash = "sha256:ce9c432eda0dc91cf618a5cedf1a4e142651196bbcd2c80e89ed5a907e5cfaf1", size = 345197 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/1b/e0a87d256e40e8c888847551b20a017a6b98139178505dc7ffb96f04e954/dnspython-2.7.0-py3-none-any.whl", hash = "sha256:b4c34b7d10b51bcc3a5071e7b8dee77939f1e878477eeecc965e9835f63c6c86", size = 313632 },
+]
+
+[[package]]
+name = "email-validator"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dnspython" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/ce/13508a1ec3f8bb981ae4ca79ea40384becc868bfae97fd1c942bb3a001b1/email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7", size = 48967 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/ee/bf0adb559ad3c786f12bcbc9296b3f5675f529199bef03e2df281fa1fadb/email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631", size = 33521 },
+]
+
+[[package]]
 name = "filelock"
 version = "3.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -53,6 +76,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/82/bf/c68c46601bacd4c6fb4dd751a42b6e7087240eaabc6487f2ef7a48e0e8fc/identify-2.6.6.tar.gz", hash = "sha256:7bec12768ed44ea4761efb47806f0a41f86e7c0a5fdf5950d4648c90eca7e251", size = 99217 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/74/a1/68a395c17eeefb04917034bd0a1bfa765e7654fa150cca473d669aa3afb5/identify-2.6.6-py2.py3-none-any.whl", hash = "sha256:cbd1810bce79f8b671ecb20f53ee0ae8e86ae84b557de31d89709dc2a48ba881", size = 99083 },
+]
+
+[[package]]
+name = "idna"
+version = "3.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442 },
 ]
 
 [[package]]
@@ -253,6 +285,14 @@ dependencies = [
     { name = "pydantic-settings" },
 ]
 
+[package.optional-dependencies]
+email = [
+    { name = "email-validator" },
+]
+regions = [
+    { name = "text-region-parser" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "mypy" },
@@ -267,9 +307,12 @@ tests = [
 
 [package.metadata]
 requires-dist = [
-    { name = "pydantic", specifier = ">=2" },
-    { name = "pydantic-settings", specifier = ">=2" },
+    { name = "email-validator", marker = "extra == 'email'", specifier = ">=2.2.0" },
+    { name = "pydantic", specifier = ">=2.7" },
+    { name = "pydantic-settings", specifier = ">=2.3" },
+    { name = "text-region-parser", marker = "extra == 'regions'", specifier = ">=0.1.1" },
 ]
+provides-extras = ["email", "regions"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -375,6 +418,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c8/47/34b4901b546c923f602aef2c10b3b81a08b1028c7d0bc4b5b9ea740cb3ac/ssort-0.14.0.tar.gz", hash = "sha256:4ab15d04d94012158f2eac43478f61e08befb53809c78324921dcf872d7172ef", size = 22645 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6e/77/59c5c354c0b62b68b2cdabee4e2d484f00e333b26f3452221924397c84b2/ssort-0.14.0-py3-none-any.whl", hash = "sha256:31864909eb7b4a02b14fb52d1918315b5fb8a8124b5d721b0adebe9c0d293219", size = 26865 },
+]
+
+[[package]]
+name = "text-region-parser"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2a/d6/7fce2ff3010edf1ffb7fb3684d2f28146c00f7c209ec9525b6068d98dc4a/text_region_parser-0.1.1.tar.gz", hash = "sha256:d7a1f0a6cbe851f37c94552cf41ce011621c1a62623e7215c02624cce05b8436", size = 38337 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bd/e6/7069a798b671ba87fdc0a2bc8c376396cfe17907fa956882d7ba713e0023/text_region_parser-0.1.1-py3-none-any.whl", hash = "sha256:79107987d6c4ffd3b432d612c276c5965c2af9d770088a8437ca4456de548f76", size = 9725 },
 ]
 
 [[package]]

@@ -50,8 +50,8 @@ class PSECLISettings(PSESettings):
     env_file: Path | None = Field(
         None,
         description=(
-            "The path to the `.env` file to load environment variables. "
-            "Useful, then you have a Settings class/instance, which require values while running."
+            "he path to the .env file to load environment variables. "
+            "Useful when you have a Settings class/instance, which requires values while running."
         ),
     )
 

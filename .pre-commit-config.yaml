@@ -64,3 +64,5 @@ repos:
         language: python
         files: \.py$
         pass_filenames: false
+        additional_dependencies:
+          - '.[email,regions]'
