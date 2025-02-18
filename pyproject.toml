@@ -40,6 +40,14 @@ dependencies = [
 [project.scripts]
 pydantic-settings-export = "pydantic_settings_export.cli:main"
 
+[project.optional-dependencies]
+email = [
+    "email-validator>=2.2.0",
+]
+regions = [
+    "text-region-parser>=0.1.1",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.12.1",
@@ -159,7 +167,6 @@ exclude = [
 disable_error_code = [
     "call-arg",
 ]
-enable_incomplete_feature = ["NewGenericSyntax"]
 
 # https://github.com/jag-k/pydantic-settings-export
 [tool.pydantic_settings_export]
@@ -195,4 +202,12 @@ table_only = true
 file_prefix = "Simple Configuration. Just a table."
 paths = [
     "docs/SimpleConfiguration.md",
+]
+
+[[tool.pydantic_settings_export.generators.markdown]]
+table_only = true
+file_prefix = "Injected Configuration. Just a table."
+region = "config"
+paths = [
+    "docs/InjectedConfiguration.md",
 ]
