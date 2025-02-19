@@ -131,7 +131,7 @@ pydantic-settings-export --generator markdown --generator dotenv your_app.settin
 pydantic-settings-export --help
 ```
 
-For complete documentation including:
+For complete documentation, including:
 
 - All command options
 - Environment variables
@@ -297,7 +297,7 @@ This project uses modern Python development tools:
 We welcome contributions! Before contributing:
 
 1. Create a GitHub Issue as the first step — this is **required**
-2. Fork the repository
+2. Fork the repository to your own GitHub account
 3. Create a branch following our naming convention:
     - Format: `<domain>/<issue-number>-<short-description>`.
     - Domains: `fix` or `feature`.

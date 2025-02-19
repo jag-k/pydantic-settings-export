@@ -122,7 +122,6 @@ class DotEnvGenerator(AbstractGenerator):
             result += "\n"
 
         for child in settings_info.child_settings:
-            result += self.generate_single(child)
             child_result = self.generate_single(child)
             if child_result.strip():
                 result += child_result
