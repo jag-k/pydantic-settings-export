@@ -78,7 +78,7 @@ class PSECLISettings(PSESettings):
                     f"- For toml file: `[[tool.pydantic_settings_export.generators.{generator.name}]]`"
                     f"The old-style will be removed in the future!",
                     DeprecationWarning,
-                    stacklevel=1,
+                    stacklevel=2,
                 )
                 generators[generator.name] = [config]
 
@@ -90,7 +90,7 @@ class PSECLISettings(PSESettings):
                     f"- For toml file: `[[tool.pydantic_settings_export.generators.{name}]]`"
                     f"The old-style will be removed in the future!",
                     DeprecationWarning,
-                    stacklevel=1,
+                    stacklevel=2,
                 )
                 generators[name] = [gen_configs]
         return data

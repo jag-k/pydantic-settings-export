@@ -110,7 +110,7 @@ class MarkdownSettings(BaseGeneratorSettings):
                     "Use `paths` instead."
                 ),
                 DeprecationWarning,
-                stacklevel=1,
+                stacklevel=2,
             )
             self.paths = [path / self.name for path in self.save_dirs]
         self.paths = [p.absolute().resolve() for p in self.paths]
