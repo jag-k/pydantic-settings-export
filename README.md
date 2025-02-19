@@ -1,3 +1,11 @@
+<!-- markdownlint-configure-file
+{
+  "MD007": {
+    "indent": 4
+  }
+}
+-->
+
 # pydantic-settings-export
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
@@ -48,9 +56,9 @@ Create Markdown docs, `.env.example` files, and more with minimal configuration.
 Optional dependencies (aka `extras`):
 
 - `email` -- for email validation support (`email-validator >= 2.2.0`).
-  - Required for `pydantic.EmailStr` type.
+    - Required for `pydantic.EmailStr` type.
 - `regions` -- for Markdown region insertion support (`text-region-parser >= 0.1.1`).
-  - Required for Markdown generator with `region` option.
+    - Required for Markdown generator with `region` option.
 
 Install with optional dependencies:
 
@@ -72,6 +80,7 @@ pip install "pydantic-settings-export[regions]"  # Install with regions extra
 2. Create your settings model:
     ```python
     from pydantic_settings import BaseSettings
+
 
     class AppSettings(BaseSettings):
         """Application settings."""
