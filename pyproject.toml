@@ -183,7 +183,7 @@ paths = [
 
 [[tool.pydantic_settings_export.generators.dotenv]]
 paths = [
-    "examples/.env.only-optional.example",
+    "examples/.env.only_optional_mode.example",
 ]
 mode = "only-optional"
 split_by_group = false

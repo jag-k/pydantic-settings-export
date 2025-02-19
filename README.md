@@ -237,13 +237,13 @@ See real-world examples of different output formats:
 ### Environment Files
 
 - [.env.example](examples/.env.example) - Full example with comments and sections
-- [.env.only-optional.example](examples/.env.only-optional.example) - Example with only optional fields
+- [.env.only_optional_mode.example](examples/.env.only_optional_mode.example) - Example with only optional fields
 
 ### Documentation
 
 - [Configuration.md](examples/Configuration.md) - Full configuration documentation with tables and descriptions
 - [SimpleConfiguration.md](examples/SimpleConfiguration.md) - Basic table-only configuration
-- [InjectedConfiguration.md](examples/InjectedConfiguration.md) - Configuration injected into existing file
+- [InjectedConfiguration.md](examples/InjectedConfiguration.md) - Configuration injected into an existing file
 
 ## 📚 Learn More
 
@@ -275,8 +275,8 @@ This is a personal pet project maintained in my spare time. The development prio
 
 1. Bug fixes
 2. Features from Roadmap:
-    - Issues with closest milestone.
-    - General milestone issues.
+    - Issues with the closest milestone,
+    - General milestones' issues.
     - Issues labeled `bug` or `feature request`.
     - Features listed in this README.
 3. New feature proposals
@@ -296,7 +296,7 @@ This project uses modern Python development tools:
 
 We welcome contributions! Before contributing:
 
-1. Create a GitHub Issue first — this is **required**
+1. Create a GitHub Issue as the first step — this is **required**
 2. Fork the repository
 3. Create a branch following our naming convention:
     - Format: `<domain>/<issue-number>-<short-description>`.
