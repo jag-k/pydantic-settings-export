@@ -74,7 +74,7 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
     # If it is a ForwardRef, get the value or the argument to return something like `CustomType`
     # instead of `"CustomType"`, `ForwardRef("CustomType")` or `ForwardRef`.
     if isinstance(annotation, typing.ForwardRef):
-        return annotation.__forward_value__ or annotation.__forward_arg__
+        return [annotation.__forward_value__ or annotation.__forward_arg__]
 
     # Map the annotation to the type in the FIELD_TYPE_MAP
     return [FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")]
@@ -187,15 +187,16 @@ class FieldInfoModel(BaseModel):
 
         # Get the aliases from the field if it exists
         aliases: list[str] = []
+        validation_alias: str | AliasChoices | AliasPath | None = field.validation_alias
         if field.alias:
             aliases = [field.alias]
-        if field.validation_alias:
-            if isinstance(field.validation_alias, str):
-                aliases.append(field.validation_alias)
-            elif isinstance(field.validation_alias, AliasChoices):
-                aliases.extend(field.validation_alias.choices)
-            elif isinstance(field.validation_alias, AliasPath):
-                aliases = [".".join(map(str, field.validation_alias.path))]
+        if validation_alias:
+            if isinstance(validation_alias, str):
+                aliases.append(validation_alias)
+            elif isinstance(validation_alias, AliasChoices):
+                aliases.extend(validation_alias.choices)
+            elif isinstance(validation_alias, AliasPath):
+                aliases = [".".join(map(str, validation_alias.path))]
 
         return cls(
             name=name,

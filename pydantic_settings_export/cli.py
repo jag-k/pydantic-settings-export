@@ -21,17 +21,27 @@ from pydantic_settings_export.utils import ObjectImportAction, import_settings_f
 from pydantic_settings_export.version import __version__
 
 CDW = Path.cwd()
-PROJECT_NAME: str = "pydantic-settings-export"
 
 
-self_pyproject_file = Path(__file__).resolve().parents[1] / "pyproject.toml"
-try:
-    if self_pyproject_file.is_file():
-        with self_pyproject_file.open("rb") as f:
-            PROJECT_NAME: str = load(f).get("project", {}).get("name", PROJECT_NAME)
-except Exception as e:
-    warnings.warn(f"Failed to parse pyproject.toml: {e}", stacklevel=2)
+def _make_project_name(default_name: str) -> str:
+    self_pyproject_file = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    try:
+        if self_pyproject_file.is_file():
+            with self_pyproject_file.open("rb") as f:
+                project_name: str | None = load(f).get("project", {}).get("name", None)
+                if not project_name:
+                    warnings.warn(
+                        f"Project name not found in {self_pyproject_file}! Will be used {default_name!r}",
+                        stacklevel=2,
+                    )
+                    return default_name
+                return project_name
+    except Exception as e:
+        warnings.warn(f"Failed to parse {self_pyproject_file}: {e}", stacklevel=2)
+    return default_name
 
+
+PROJECT_NAME: str = _make_project_name("pydantic-settings-export")
 Generators = AbstractGenerator.create_generator_config_model(multiple_for_single=True)
 
 
@@ -119,8 +129,13 @@ class PSECLISettings(PSESettings):
             for gen_config in gen_configs:
                 g = all_generators.get(name)
                 if not g:
+                    warnings.warn(f"Generator {name!r} not found", stacklevel=2)
                     continue
-                result.append(g(self, gen_config))
+                try:
+                    result.append(g(self, gen_config))
+                except Exception as e:
+                    warnings.warn(f"Failed to initialize generator {name!r}: {e}", stacklevel=2)
+                    continue
         return result
 
 
@@ -284,8 +299,12 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
             continue
         try:
             os.environ.update(dotenv_values(stream=env_file))
+        except ValueError as e:
+            warnings.warn(f"Invalid format in environment file {env_file.name}: {e}", stacklevel=2)
+        except OSError as e:
+            warnings.warn(f"Failed to read environment file {env_file.name}: {e}", stacklevel=2)
         except Exception as e:
-            warnings.warn(f"Failed to load environment file {env_file.name}: {e}", stacklevel=2)
+            warnings.warn(f"Unexpected error loading environment file {env_file.name}: {e}", stacklevel=2)
 
 
 def _setup_settings(
