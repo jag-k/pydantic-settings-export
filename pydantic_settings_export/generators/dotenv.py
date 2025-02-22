@@ -19,9 +19,9 @@ DotEnvMode = Literal["all", "only-optional", "only-required"]
 
 # Map from DotEnvMode to (is_optional, is_required)
 DOTENV_MODE_MAP: dict[DotEnvMode, tuple[bool, bool]] = {
-    "all": (True, True),
-    "only-optional": (True, False),
-    "only-required": (False, True),
+    "all": (True, True),  # Include both (optional and required)
+    "only-optional": (True, False),  # Only include optional fields
+    "only-required": (False, True),  # Only include required fields
 }
 DOTENV_MODE_MAP_DEFAULT = DOTENV_MODE_MAP["all"]
 
@@ -90,21 +90,25 @@ class DotEnvGenerator(AbstractGenerator):
 
         :param settings_info: The settings info model.
         :param field: The field info model.
-        :param is_optional: Whether the field is optional.
-        :param is_required: Whether the field is required.
-        :return: The string to add to the .env file.
+        :param is_optional: Whether to include optional fields
+        :param is_required: Whether to include required fields
+        :return: The string to add to the .env file or None if the field should be skipped.
         """
+        # Get the environment variable name, using alias if available
         field_name = f"{settings_info.env_prefix}{field.name.upper()}"
         if field.aliases:
             field_name = field.aliases[0].upper()
 
+        # Skip required fields if we're only including optional ones
+        if field.is_required and not is_required:
+            return None
+
+        # Format optional fields with a comment prefix
         field_string = f"{field_name}="
         if not field.is_required and is_optional:
             field_string = f"# {field_name}={field.default}"
 
-        elif field.is_required and not is_required:
-            return None
-
+        # Add examples as comments if available and enabled
         if field.examples and field.examples != [field.default] and self.generator_config.add_examples:
             field_string += "  # " + (", ".join(field.examples))
         return field_string

@@ -3,7 +3,7 @@ import typing
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, Self, TypeVar, Union, get_args, get_origin
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -48,17 +48,18 @@ P = TypeVar("P", bound=Path)
 
 
 def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[str]:
-    args = getattr(annotation, "__args__", [])
+    args = get_args(annotation)
     if remove_none:
         args = [arg for arg in args if arg is not None]
 
     # If it is an Alias (like `list[int]`), get the origin (like `list`)
-    if isinstance(annotation, typing.GenericAlias):
-        annotation = annotation.__origin__
+    origin = get_origin(annotation)
+    if origin is not None:
+        annotation = origin
 
     # If it is a Union, get all types to return something like `integer | string`
     # instead of `Union[int, str]`, `int | str`, or `Union`.
-    if isinstance(annotation, UnionType | typing._UnionGenericAlias):
+    if origin in (Union, UnionType):
         args = list(filter(bool, args))
         if args:
             return [t for arg in args for t in get_type_by_annotation(arg)]
@@ -67,7 +68,7 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
 
     # If it is a Literal, get all types to return in "original" format like `1 | 'some-str'`
     # instead of `Literal[1, 'some-str']` or `Literal`.
-    if isinstance(annotation, typing._LiteralGenericAlias):
+    if origin is Literal:
         return [json.dumps(a, default=repr) for a in args]
 
     # If it is a ForwardRef, get the value or the argument to return something like `CustomType`

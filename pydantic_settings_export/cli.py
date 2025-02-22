@@ -2,11 +2,11 @@ import argparse
 import os
 import sys
 import warnings
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from inspect import isclass
 from pathlib import Path
 from tomllib import load
-from typing import Any
+from typing import Any, TextIO
 
 from dotenv import dotenv_values, load_dotenv
 from pydantic import Field, SkipValidation, model_validator
@@ -25,9 +25,12 @@ PROJECT_NAME: str = "pydantic-settings-export"
 
 
 self_pyproject_file = Path(__file__).resolve().parents[1] / "pyproject.toml"
-if self_pyproject_file.is_file():
-    with self_pyproject_file.open("rb") as f:
-        PROJECT_NAME: str = load(f).get("project", {}).get("name", PROJECT_NAME)
+try:
+    if self_pyproject_file.is_file():
+        with self_pyproject_file.open("rb") as f:
+            PROJECT_NAME: str = load(f).get("project", {}).get("name", PROJECT_NAME)
+except Exception as e:
+    warnings.warn(f"Failed to parse pyproject.toml: {e}", stacklevel=2)
 
 Generators = AbstractGenerator.create_generator_config_model(multiple_for_single=True)
 
@@ -270,25 +273,70 @@ def make_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(parse_args: Sequence[str] | None = None):  # noqa: D103
-    parser = make_parser()
-    args: argparse.Namespace = parser.parse_args(parse_args)
-    for env_file in args.env_file:
+def _load_env_files(env_files: Iterable[TextIO]) -> None:
+    """Load environment variables from the provided env files.
+
+    :param env_files: Iterable of file objects to load environment variables from.
+    """
+    for env_file in env_files:
         if not Path(env_file.name).exists():
             warnings.warn(f"Environment file {env_file.name} does not exist", stacklevel=2)
             continue
-        os.environ.update(dotenv_values(stream=env_file))
+        try:
+            os.environ.update(dotenv_values(stream=env_file))
+        except Exception as e:
+            warnings.warn(f"Failed to load environment file {env_file.name}: {e}", stacklevel=2)
 
-    if args.config_file:
-        PSECLISettings.model_config["toml_file"] = args.config_file
+
+def _setup_settings(
+    config_file: Path | None = None,
+    project_dir: Path | None = None,
+) -> PSECLISettings:
+    """Initialize and configure PSECLISettings.
+
+    :param config_file: Path to the configuration file
+    :param project_dir: Path to the project directory
+    :return: Configured PSECLISettings instance
+    """
+    if config_file:
+        PSECLISettings.model_config["toml_file"] = config_file
     s = PSECLISettings()
 
-    if args.project_dir:
-        s.project_dir = Path(args.project_dir).resolve().absolute()
+    if project_dir:
+        s.project_dir = project_dir.resolve().absolute()
     sys.path.insert(0, str(s.project_dir))
-    generators = args.generator
+    return s
 
+
+def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) -> list[type[AbstractGenerator]]:
+    """Process and validate generator arguments.
+
+    :param generators: Sequence of generator classes
+    :return: List of valid generator classes
+    """
+    result = []
+    for g in generators:
+        if not g:
+            warnings.warn("Skipping unknown generator", stacklevel=2)
+            continue
+        result.append(g)
+    return result
+
+
+def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
+    parser = make_parser()
+    args: argparse.Namespace = parser.parse_args(parse_args)
+
+    # Load environment variables from files
+    _load_env_files(args.env_file)
+
+    # Setup settings
+    s = _setup_settings(args.config_file, args.project_dir)
+
+    # Process generators
+    generators = _process_generators(args.generator)
     s.generators_list = generators
+
     if args.help_generators:
         generators_help = _generators_help(s.generators_list)
         parser.exit(0, generators_help)
@@ -297,8 +345,9 @@ def main(parse_args: Sequence[str] | None = None):  # noqa: D103
     if not settings:
         parser.exit(1, parser.format_help())
 
+    # Run main settings export
+    exporter = Exporter(s, s.get_generators())
     try:
-        exporter = Exporter(s, s.get_generators())
         result = exporter.run_all(*settings)
     except Exception as e:
         parser.exit(1, f"Failed to initialize exporter: {e}\n")
