@@ -8,20 +8,22 @@ from pydantic import ImportString, TypeAdapter
 from pydantic_core import ValidationError
 from pydantic_settings import BaseSettings
 
+from pydantic_settings_export.generators import AbstractGenerator
+
 __all__ = (
     "make_pretty_md_table",
     "make_pretty_md_table_from_dict",
 )
 
 
-def make_pretty_md_table(header: list[str], rows: list[list[str]]) -> str:  # noqa: C901
+def make_pretty_md_table(headers: list[str], rows: list[list[str]]) -> str:  # noqa: C901
     """Make a pretty Markdown table with column alignment.
 
-    :param header: The header of the table.
+    :param headers: The header of the table.
     :param rows: The rows of the table.
     :return: The prettied Markdown table.
     """
-    col_sizes = [len(h) for h in header]
+    col_sizes = [len(h) for h in headers]
     for row in rows:
         for i, cell in enumerate(row):
             if cell is None:
@@ -29,10 +31,10 @@ def make_pretty_md_table(header: list[str], rows: list[list[str]]) -> str:  # no
             col_sizes[i] = max(col_sizes[i], len(cell))
 
     result = "|"
-    for i, h in enumerate(header):
+    for i, h in enumerate(headers):
         result += f" {h}{' ' * (col_sizes[i] - len(h))} |"
     result += "\n|"
-    for i, _ in enumerate(header):
+    for i, _ in enumerate(headers):
         result += f"{'-' * (col_sizes[i] + 2)}|"
     for row in rows:
         result += "\n|"
@@ -43,23 +45,32 @@ def make_pretty_md_table(header: list[str], rows: list[list[str]]) -> str:  # no
     return result
 
 
-def make_pretty_md_table_from_dict(data: list[dict[str, str | None]]) -> str:
+def make_pretty_md_table_from_dict(data: list[dict[str, str | None]], headers: list[str] | None = None) -> str:
     """Make a pretty Markdown table with column alignment from a list of dictionaries.
 
     :param data: The rows of the table as dictionaries.
+    :param headers: The headers of the table.
     :return: The prettied Markdown table.
     """
-    # Save unique keys from all rows and save order
-    header: list[str] = list(
-        {
-            # We need only key
-            key: 0
-            for row in data
-            for key in row.keys()
-        }.keys(),
-    )
-    rows = [[row.get(key, None) or "" for key in header] for row in data]
-    return make_pretty_md_table(header, rows)
+    if not headers:
+        # Save unique keys from all rows and save order
+        headers = list(
+            {
+                # We need only the keys.
+                key: 0
+                for row in data
+                for key in row.keys()
+            }.keys(),
+        )
+
+    # noinspection PyUnboundLocalVariable
+    rows = [[row.get(key, None) or "" for key in headers] for row in data]
+    return make_pretty_md_table(headers, rows)
+
+
+def q(s: str) -> str:
+    """Add quotes around the string."""
+    return f"`{s}`"
 
 
 class ObjectImportAction(argparse.Action):
@@ -80,6 +91,20 @@ class ObjectImportAction(argparse.Action):
         :raise ModuleNotFoundError: If the module is not found.
         :return: The imported object.
         """
+        builtin_generators = AbstractGenerator.generators()
+        builtin_generator_names = {g.__name__: g for g in builtin_generators.values()}
+
+        obj: AbstractGenerator | None = builtin_generators.get(value, None)
+        if obj:
+            return obj
+
+        obj = builtin_generator_names.get(value, None)
+        if obj:
+            return obj
+
+        if ":" not in value:
+            raise ValueError(f"The {value!r} is not in the format 'module:class'.")
+
         try:
             module_name, class_name = value.rsplit(":", 1)
         except ValueError:

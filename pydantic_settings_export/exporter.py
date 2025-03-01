@@ -1,8 +1,9 @@
+import warnings
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
-from pydantic_settings_export.generators import AbstractGenerator
+from pydantic_settings_export.generators.abstract import AbstractGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
 
@@ -15,10 +16,17 @@ class Exporter:
     def __init__(
         self,
         settings: PSESettings | None = None,
-        generators: list[type[AbstractGenerator]] | None = None,
+        generators: list[AbstractGenerator] | None = None,
     ) -> None:
         self.settings: PSESettings = settings or PSESettings()
-        self.generators: list[type[AbstractGenerator]] = settings.generators_list if generators is None else generators
+        if generators is None:
+            generators = []
+            for generator_class in AbstractGenerator.ALL_GENERATORS:
+                try:
+                    generators.append(generator_class(self.settings))
+                except Exception as e:
+                    warnings.warn(f"Failed to initialize generator {generator_class.__name__}: {e}", stacklevel=2)
+        self.generators: list[AbstractGenerator] = generators
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
         """Run all generators for the given settings.
@@ -29,10 +37,14 @@ class Exporter:
         settings_infos: list[SettingsInfoModel] = [
             SettingsInfoModel.from_settings_model(s, self.settings) for s in settings
         ]
+        paths: list[Path] = []
 
-        return [
-            # Run all generators for each setting info
-            path
-            for generator in self.generators
-            for path in generator.run(self.settings, *settings_infos)
-        ]
+        for generator in self.generators:
+            try:
+                # Run all generators for each setting info
+                paths.extend(generator.run(*settings_infos))
+            except Exception as e:
+                warnings.warn(f"Generator {generator.__class__.__name__} failed: {e}", stacklevel=2)
+            continue
+
+        return paths

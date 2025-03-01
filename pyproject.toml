@@ -1,7 +1,7 @@
 [project]
 name = "pydantic-settings-export"
 dynamic = ["version"]
-description = "Export your Pydantic settings to a Markdown and .env.example files!"
+description = "Export your Pydantic settings to documentation with ease!"
 readme = "README.md"
 authors = [
     { name = "Jag_k", email = "30597878+jag-k@users.noreply.github.com" }
@@ -20,7 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-license = {file = "LICENCE"}
+license = { file = "LICENCE" }
 repository = "https://github.com/jag-k/pydantic-settings-export"
 homepage = "https://github.com/jag-k/pydantic-settings-export#readme"
 packages = [
@@ -28,8 +28,8 @@ packages = [
 ]
 keywords = ["pydantic", "settings", "export", "markdown", "dotenv", "config"]
 dependencies = [
-    "pydantic-settings>=2",
-    "pydantic>=2",
+    "pydantic-settings>=2.3",
+    "pydantic>=2.7",
 ]
 
 [project.urls]
@@ -39,6 +39,14 @@ dependencies = [
 
 [project.scripts]
 pydantic-settings-export = "pydantic_settings_export.cli:main"
+
+[project.optional-dependencies]
+email = [
+    "email-validator>=2.2.0",
+]
+regions = [
+    "text-region-parser>=0.1.1",
+]
 
 [dependency-groups]
 dev = [
@@ -109,6 +117,10 @@ ignore = [
     'F403', # from {name} import * used; unable to detect undefined names
     'F405', # {name} may be undefined, or defined from star imports
 ]
+'tests/**/*.py' = [
+    'D', # Docstring Errors
+    'S101', # Use of assert detected
+]
 
 # https://docs.astral.sh/ruff/settings/#lintpydocstyle
 [tool.ruff.lint.pydocstyle]
@@ -155,22 +167,45 @@ exclude = [
 disable_error_code = [
     "call-arg",
 ]
-enable_incomplete_feature = ["NewGenericSyntax"]
 
 # https://github.com/jag-k/pydantic-settings-export
 [tool.pydantic_settings_export]
 project_dir = "."
 default_settings = [
-    "pydantic_settings_export.settings:PSESettings",
+    "pydantic_settings_export.cli:PSECLISettings",
 ]
 env_file = ".env"
 
-[tool.pydantic_settings_export.generators.dotenv]
-name = ".env.example"
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [
+    "examples/.env.example",
+]
 
-[tool.pydantic_settings_export.generators.markdown]
-name = "Configuration.md"
-save_dirs = [
-    "docs",
-    "wiki",
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [
+    "examples/.env.only_optional_mode.example",
+]
+mode = "only-optional"
+split_by_group = false
+add_examples = false
+
+[[tool.pydantic_settings_export.generators.markdown]]
+paths = [
+    "examples/Configuration.md",
+    "wiki/Configuration.md",
+]
+
+[[tool.pydantic_settings_export.generators.markdown]]
+table_only = true
+file_prefix = "Simple Configuration. Just a table."
+paths = [
+    "examples/SimpleConfiguration.md",
+]
+
+[[tool.pydantic_settings_export.generators.markdown]]
+table_only = true
+file_prefix = "Injected Configuration. Just a table."
+region = "config"
+paths = [
+    "examples/InjectedConfiguration.md",
 ]

@@ -138,9 +138,10 @@ local.*
 .fleet/
 .vscode/
 tests/code_coverage/
+**/__pycache__/
 */tmp.py
 wiki/
-pyrightconig.json
+pyrightconfig.json
 .python_version
 
 
@@ -150,3 +151,4 @@ mongo/
 
 # Hatch version control from https://github.com/ofek/hatch-vcs
 pydantic_settings_export/version.py
+.aider*

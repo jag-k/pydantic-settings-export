@@ -1,9 +1,11 @@
+import json
+import typing
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, Self, TypeVar, Union, get_args, get_origin
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticSerializationError, PydanticUndefined
 from pydantic_settings import BaseSettings
@@ -45,6 +47,39 @@ def _prepare_example(example: Any, value_type: type | None = None) -> str:
 P = TypeVar("P", bound=Path)
 
 
+def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[str]:
+    args = get_args(annotation)
+    if remove_none:
+        args = [arg for arg in args if arg is not None]
+
+    # If it is an Alias (like `list[int]`), get the origin (like `list`)
+    origin = get_origin(annotation)
+    if origin is not None:
+        annotation = origin
+
+    # If it is a Union, get all types to return something like `integer | string`
+    # instead of `Union[int, str]`, `int | str`, or `Union`.
+    if origin in (Union, UnionType):
+        args = list(filter(bool, args))
+        if args:
+            return [t for arg in args for t in get_type_by_annotation(arg)]
+        else:
+            annotation = None
+
+    # If it is a Literal, get all types to return in "original" format like `1 | 'some-str'`
+    # instead of `Literal[1, 'some-str']` or `Literal`.
+    if origin is Literal:
+        return [json.dumps(a, default=repr) for a in args]
+
+    # If it is a ForwardRef, get the value or the argument to return something like `CustomType`
+    # instead of `"CustomType"`, `ForwardRef("CustomType")` or `ForwardRef`.
+    if isinstance(annotation, typing.ForwardRef):
+        return [annotation.__forward_value__ or annotation.__forward_arg__]
+
+    # Map the annotation to the type in the FIELD_TYPE_MAP
+    return [FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")]
+
+
 def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     # Check if default is a Path and is absolute
     if default.is_absolute():
@@ -72,17 +107,26 @@ class FieldInfoModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(..., description="The name of the field.")
-    type: str = Field(..., description="The type of the field.")
+    types: list[str] = Field(..., description="The type of the field.")
     default: str | None = Field(None, description="The default value of the field as a string.")
     description: str | None = Field(None, description="The description of the field.")
-    examples: list[str] = Field(default_factory=list, description="The example of the field.")
-    alias: str | None = Field(None, description="The alias of the field.")
+    examples: list[str] = Field(default_factory=list, description="The examples of the field.")
+    aliases: list[str] = Field(default_factory=list, description="The aliases of the field.")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
+
+    @property
+    def full_name(self) -> str:
+        """Get the full name (aliased or not) of the field."""
+        return self.aliases[0] if self.aliases else self.name
 
     @property
     def is_required(self) -> bool:
         """Check if the field is required."""
         return self.default is None
+
+    def has_examples(self) -> bool:
+        """Check if the field has examples."""
+        return self.examples and self.examples != [self.default]
 
     @staticmethod
     def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
@@ -126,14 +170,10 @@ class FieldInfoModel(BaseModel):
         # Parse the annotation of the field
         annotation = field.annotation
 
-        if isinstance(annotation, UnionType):
-            args = list(filter(bool, getattr(annotation, "__args__", [])))
-            annotation = args[0] if args else None
-
         # Get the name from the alias if it exists
-        name: str = field.alias or name
+        name: str = name
         # Get the type from the FIELD_TYPE_MAP if it exists
-        type_: str = FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")
+        types: list[str] = get_type_by_annotation(annotation)
         # Get the default value from the field if it exists
         default = cls.create_default(field, global_settings)
         # Get the description from the field if it exists
@@ -145,13 +185,26 @@ class FieldInfoModel(BaseModel):
         # Get the deprecated status from the field if it exists
         deprecated: bool = field.deprecated or False
 
+        # Get the aliases from the field if it exists
+        aliases: list[str] = []
+        validation_alias: str | AliasChoices | AliasPath | None = field.validation_alias
+        if field.alias:
+            aliases = [field.alias]
+        if validation_alias:
+            if isinstance(validation_alias, str):
+                aliases.append(validation_alias)
+            elif isinstance(validation_alias, AliasChoices):
+                aliases.extend(validation_alias.choices)
+            elif isinstance(validation_alias, AliasPath):
+                aliases = [".".join(map(str, validation_alias.path))]
+
         return cls(
             name=name,
-            type=type_,
+            types=types,
             default=default,
             description=description,
             examples=examples,
-            alias=field.alias,
+            aliases=aliases,
             deprecated=deprecated,
         )
 
@@ -188,19 +241,23 @@ class SettingsInfoModel(BaseModel):
 
         # If the settings are a BaseSettings, then we can get the prefix and nested delimiter from the model config
         if isinstance(settings, BaseSettings) or (isclass(settings) and issubclass(settings, BaseSettings)):
-            prefix = prefix + settings.model_config.get("env_prefix", "")
-            nested_delimiter = settings.model_config.get("env_nested_delimiter", "_")
+            prefix = prefix or settings.model_config.get("env_prefix", "")
+            nested_delimiter = settings.model_config.get("env_nested_delimiter", "_") or "_"
 
         child_settings = []
         fields = []
         for name, field_info in fields_info.items():
-            if global_settings and global_settings.respect_exclude and field_info.exclude:
+            if (
+                global_settings
+                and global_settings.respect_exclude
+                and (field_info.exclude or (field_info.json_schema_extra or {}).get("exclude"))
+            ):
                 continue
             annotation = field_info.annotation
 
             # If the annotation is a BaseModel (also match to BaseSettings),
             # then we need to generate a SettingsInfoModel for it
-            if isclass(annotation) and issubclass(annotation, BaseModel):
+            if isclass(annotation) and issubclass(annotation, BaseModel | BaseSettings):
                 child_settings.append(
                     cls.from_settings_model(
                         annotation,
@@ -212,6 +269,7 @@ class SettingsInfoModel(BaseModel):
                     )
                 )
                 continue
+
             fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings))
 
         docs = getdoc(settings) or ""
@@ -222,18 +280,12 @@ class SettingsInfoModel(BaseModel):
 
         # Remove all text after the first form feed character
         docs = docs.split("\f", 1)[0].strip()
-
-        return cls(
-            name=(
-                # Get the title from the settings model if it exists
-                conf.get("title", None)
-                # Otherwise, get the name from the settings model if it exists
-                or getattr(settings, "__name__", None)
-                # Otherwise, get the class name from the settings model
-                or str(settings.__class__.__name__)
-            ),
-            docs=docs.strip(),
-            env_prefix=prefix,
-            fields=fields,
-            child_settings=child_settings,
+        settings_name = (
+            # Get the title from the settings model if it exists
+            conf.get("title", None)
+            # Otherwise, get the name from the settings model if it exists
+            or getattr(settings, "__name__", None)
+            # Otherwise, get the class name from the settings model
+            or str(settings.__class__.__name__)
         )
+        return cls(name=settings_name, docs=docs, env_prefix=prefix, fields=fields, child_settings=child_settings)
