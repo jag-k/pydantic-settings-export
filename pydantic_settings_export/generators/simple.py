@@ -16,12 +16,11 @@ class SimpleSettings(BaseGeneratorSettings):
     model_config = ConfigDict(title="Generator: Simple configuration")
 
 
-class SimpleGenerator(AbstractGenerator):
+class SimpleGenerator(AbstractGenerator[SimpleSettings]):
     """The Simple generator."""
 
     name = "simple"
     config = SimpleSettings
-    generator_config: SimpleSettings
 
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:  # noqa: C901
         """Generate simple text documentation for settings.

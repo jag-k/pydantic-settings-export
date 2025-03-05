@@ -1,10 +1,16 @@
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, TypeAlias, TypeVar, final
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, Optional, TypeVar, cast, final
 
 from pydantic import BaseModel, Field, create_model
 
 from pydantic_settings_export.settings import PSESettings
+
+if sys.version_info < (3, 11):
+    from typing_extensions import TypeAlias
+else:
+    from typing import TypeAlias
 
 if TYPE_CHECKING:
     from pydantic_settings_export.models import SettingsInfoModel
@@ -38,21 +44,21 @@ class BaseGeneratorSettings(BaseModel):
 C = TypeVar("C", bound=BaseGeneratorSettings)
 
 
-class AbstractGenerator(ABC):
+class AbstractGenerator(ABC, Generic[C]):
     """The abstract class for the configuration file generator."""
 
-    config: type[C]
     name: ClassVar[str]
+    config: ClassVar[type[BaseGeneratorSettings]]
 
     ALL_GENERATORS: ClassVar[list[type["AbstractGenerator"]]] = []
 
-    def __init__(self, settings: PSESettings, generator_config: C | None = None) -> None:
+    def __init__(self, settings: PSESettings, generator_config: Optional[C] = None) -> None:
         """Initialize the AbstractGenerator.
 
         :param settings: The settings for the generator.
         """
         self.settings = settings
-        self.generator_config: C = generator_config if generator_config else self.config()
+        self.generator_config: C = generator_config if generator_config else cast(C, self.config())
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Initialize the subclass."""
@@ -63,6 +69,7 @@ class AbstractGenerator(ABC):
             raise ValueError("Generator must have a config")
         if cls.name in AbstractGenerator.ALL_GENERATORS:
             raise ValueError(f"Generator {cls.name} already exists")
+        cls.config.__doc__ = cls.config.__doc__ or ""
         cls.config.__doc__ += f"\n\nGenerator name: `{cls.name}`."
 
         AbstractGenerator.ALL_GENERATORS.append(cls)
@@ -142,12 +149,24 @@ class AbstractGenerator(ABC):
         """
 
         def _make_arg(generator: type[AbstractGenerator]) -> tuple[Any, Any]:
-            if multiple_for_single:
-                return list[generator.config], Field(default_factory=lambda: [generator.config()])
-            return generator.config, Field(default_factory=generator.config)
+            config: Optional[type[BaseGeneratorSettings]] = getattr(generator, "config", None)
+            if config is None:
+                raise ValueError(f"Generator {generator.name} has no config")
 
-        fields = {name: _make_arg(generator) for name, generator in AbstractGenerator.generators().items()}
-        return create_model(
+            if multiple_for_single:
+                return (
+                    list[config],  # type: ignore[valid-type]
+                    Field(default_factory=lambda: [config()]),
+                )
+            return (
+                config,
+                Field(default_factory=config),
+            )
+
+        fields: dict[str, tuple[Any, Any]] = {
+            name: _make_arg(generator) for name, generator in AbstractGenerator.generators().items()
+        }
+        return create_model(  # type: ignore[call-overload]
             "Generators",
             **fields,
             __base__=BaseModel,

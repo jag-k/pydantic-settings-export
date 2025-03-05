@@ -1,9 +1,9 @@
 import json
-import typing
+import sys
 from inspect import getdoc, isclass
 from pathlib import Path
-from types import UnionType
-from typing import TYPE_CHECKING, Any, Literal, Self, TypeVar, Union, get_args, get_origin
+from types import GenericAlias
+from typing import TYPE_CHECKING, Any, ForwardRef, Literal, Optional, TypeVar, Union, cast, get_args, get_origin
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -11,6 +11,18 @@ from pydantic_core import PydanticSerializationError, PydanticUndefined
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.constants import FIELD_TYPE_MAP
+
+try:
+    from types import UnionType  # type: ignore[attr-defined]
+
+    UnionTypes: tuple[Any, ...] = (UnionType, Union)  # Just for type checking in code
+except ImportError:
+    UnionTypes = (Union,)
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 if TYPE_CHECKING:
     from pydantic_settings_export.settings import PSESettings
@@ -23,11 +35,11 @@ __all__ = (
 )
 
 
-BASE_SETTINGS_DOCS = getdoc(BaseSettings).strip()
-BASE_MODEL_DOCS = getdoc(BaseModel).strip()
+BASE_SETTINGS_DOCS = (getdoc(BaseSettings) or "").strip()
+BASE_MODEL_DOCS = (getdoc(BaseModel) or "").strip()
 
 
-def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
+def value_to_jsonable(value: Any, value_type: Optional[type] = None) -> Any:
     if value_type is None:
         value_type = type(value)
 
@@ -37,18 +49,29 @@ def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
         return str(value)
 
 
-def _prepare_example(example: Any, value_type: type | None = None) -> str:
+def _prepare_example(example: Any, value_type: Optional[type] = None) -> str:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
     return value_to_jsonable(example, value_type)
 
 
+def _alias_path_to_str(value: Union[AliasPath, str]) -> str:
+    """Convert an AliasPath or string to its string representation.
+
+    :param value: The AliasPath or string to convert
+    :return: String representation of the path
+    """
+    if isinstance(value, AliasPath):
+        return ".".join(map(str, value.path))
+    return value
+
+
 P = TypeVar("P", bound=Path)
 
 
 def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[str]:
-    args = get_args(annotation)
+    args: list[Any] = list(get_args(annotation))
     if remove_none:
         args = [arg for arg in args if arg is not None]
 
@@ -59,7 +82,7 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
 
     # If it is a Union, get all types to return something like `integer | string`
     # instead of `Union[int, str]`, `int | str`, or `Union`.
-    if origin in (Union, UnionType):
+    if origin in UnionTypes:
         args = list(filter(bool, args))
         if args:
             return [t for arg in args for t in get_type_by_annotation(arg)]
@@ -73,24 +96,26 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
 
     # If it is a ForwardRef, get the value or the argument to return something like `CustomType`
     # instead of `"CustomType"`, `ForwardRef("CustomType")` or `ForwardRef`.
-    if isinstance(annotation, typing.ForwardRef):
+    if isinstance(annotation, ForwardRef):
         return [annotation.__forward_value__ or annotation.__forward_arg__]
 
     # Map the annotation to the type in the FIELD_TYPE_MAP
     return [FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")]
 
 
-def default_path(default: P, global_settings: PSESettings | None = None) -> P:
+def default_path(default: P, global_settings: Optional[PSESettings] = None) -> P:
     # Check if default is a Path and is absolute
     if default.is_absolute():
         # if we need to replace absolute paths
         if global_settings and global_settings.relative_to.replace_abs_paths:
-            project_dir = global_settings.project_dir.resolve().absolute()
+            root_dir = global_settings.root_dir.resolve().absolute()
 
             # Make the default path relative to the global_settings
-            if default.is_relative_to(project_dir):
-                default = Path(global_settings.relative_to.alias) / default.relative_to(
-                    global_settings.project_dir.resolve().absolute()
+            if default.is_relative_to(root_dir):
+                default = cast(
+                    P,
+                    Path(global_settings.relative_to.alias)
+                    / default.relative_to(global_settings.root_dir.resolve().absolute()),
                 )
 
         # Make the default path relative to the user's home directory
@@ -108,8 +133,8 @@ class FieldInfoModel(BaseModel):
 
     name: str = Field(..., description="The name of the field.")
     types: list[str] = Field(..., description="The type of the field.")
-    default: str | None = Field(None, description="The default value of the field as a string.")
-    description: str | None = Field(None, description="The description of the field.")
+    default: Optional[str] = Field(None, description="The default value of the field as a string.")
+    description: Optional[str] = Field(None, description="The description of the field.")
     examples: list[str] = Field(default_factory=list, description="The examples of the field.")
     aliases: list[str] = Field(default_factory=list, description="The aliases of the field.")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
@@ -126,17 +151,17 @@ class FieldInfoModel(BaseModel):
 
     def has_examples(self) -> bool:
         """Check if the field has examples."""
-        return self.examples and self.examples != [self.default]
+        return bool(self.examples and self.examples != [self.default])
 
     @staticmethod
-    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
+    def create_default(field: FieldInfo, global_settings: Optional[PSESettings] = None) -> Optional[str]:
         """Make the default value for the field.
 
         :param field: The field info to generate the default value for.
         :param global_settings: The global settings.
         :return: The default value for the field as a string, or None if there is no default value.
         """
-        default: object | PydanticUndefined = field.default
+        default: Union[object, PydanticUndefined] = field.default  # type: ignore[valid-type]
 
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
@@ -158,7 +183,7 @@ class FieldInfoModel(BaseModel):
         cls,
         name: str,
         field: FieldInfo,
-        global_settings: PSESettings | None = None,
+        global_settings: Optional[PSESettings] = None,
     ) -> Self:
         """Generate FieldInfoModel using name and field.
 
@@ -177,26 +202,27 @@ class FieldInfoModel(BaseModel):
         # Get the default value from the field if it exists
         default = cls.create_default(field, global_settings)
         # Get the description from the field if it exists
-        description: str | None = field.description or None
+        description: Optional[str] = field.description or None
         # Get the example from the field if it exists
         examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
         if not examples and default:
             examples = [default]
         # Get the deprecated status from the field if it exists
-        deprecated: bool = field.deprecated or False
+        deprecated: bool = bool(field.deprecated or False)
 
         # Get the aliases from the field if it exists
         aliases: list[str] = []
-        validation_alias: str | AliasChoices | AliasPath | None = field.validation_alias
+        validation_alias: Optional[Union[str, AliasChoices, AliasPath]] = field.validation_alias
         if field.alias:
             aliases = [field.alias]
+
         if validation_alias:
             if isinstance(validation_alias, str):
                 aliases.append(validation_alias)
             elif isinstance(validation_alias, AliasChoices):
-                aliases.extend(validation_alias.choices)
+                aliases.extend(map(_alias_path_to_str, validation_alias.choices))
             elif isinstance(validation_alias, AliasPath):
-                aliases = [".".join(map(str, validation_alias.path))]
+                aliases = [_alias_path_to_str(validation_alias)]
 
         return cls(
             name=name,
@@ -223,12 +249,12 @@ class SettingsInfoModel(BaseModel):
     @classmethod
     def from_settings_model(
         cls,
-        settings: BaseSettings | type[BaseSettings],
-        global_settings: PSESettings | None = None,
+        settings: Union[BaseSettings, type[BaseSettings]],
+        global_settings: Optional[PSESettings] = None,
         prefix: str = "",
         nested_delimiter: str = "_",
     ) -> Self:
-        """Generate SettingsInfoModel using a settings model.
+        """Generate the SettingsInfoModel using a settings model.
 
         :param settings: The settings model to generate SettingsInfoModel from.
         :param global_settings: The global settings.
@@ -244,23 +270,21 @@ class SettingsInfoModel(BaseModel):
             prefix = prefix or settings.model_config.get("env_prefix", "")
             nested_delimiter = settings.model_config.get("env_nested_delimiter", "_") or "_"
 
-        child_settings = []
+        child_settings: list[SettingsInfoModel] = []
         fields = []
         for name, field_info in fields_info.items():
-            if (
-                global_settings
-                and global_settings.respect_exclude
-                and (field_info.exclude or (field_info.json_schema_extra or {}).get("exclude"))
-            ):
+            if global_settings and global_settings.respect_exclude and field_info.exclude:
                 continue
             annotation = field_info.annotation
+            if isinstance(annotation, GenericAlias):
+                annotation = annotation.__origin__
 
             # If the annotation is a BaseModel (also match to BaseSettings),
             # then we need to generate a SettingsInfoModel for it
-            if isclass(annotation) and issubclass(annotation, BaseModel | BaseSettings):
+            if isclass(annotation) and issubclass(annotation, (BaseModel, BaseSettings)):
                 child_settings.append(
                     cls.from_settings_model(
-                        annotation,
+                        cast(type[BaseSettings], annotation),
                         global_settings=global_settings,
                         # Add the prefix and nested delimiter to the child settings
                         # We need to change the prefix to uppercase to match the env prefix

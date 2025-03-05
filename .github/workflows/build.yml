@@ -29,8 +29,13 @@ jobs:
         run: |
           uv sync --all-extras --dev --frozen --no-editable
 
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-3|${{ hashFiles('.pre-commit-config.yaml') }}
+
       - name: Run linting
-        run: uv run --frozen --no-editable pre-commit run --all-files
+        run: uv run --frozen --no-editable pre-commit run --all-files --show-diff-on-failure --color=always
 
       - name: Publish to PyPI
         if: startsWith(github.ref, 'refs/tags/')

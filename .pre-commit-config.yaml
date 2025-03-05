@@ -2,46 +2,25 @@
 
 default_stages: [ pre-commit, pre-push ]
 default_language_version:
-  python: python3.12
+  python: python3.9
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: check-ast
-        always_run: true
-
       - id: check-json
-        always_run: true
-
       - id: pretty-format-json
-        always_run: true
         args: [ --autofix, --indent=4 ]
-
       - id: check-toml
-        always_run: true
-
       - id: check-yaml
-        always_run: true
-
       - id: check-xml
-        always_run: true
-
       - id: end-of-file-fixer
-        always_run: true
-
       - id: check-docstring-first
-        always_run: true
-
       - id: trailing-whitespace
         exclude: .md$
-        always_run: true
-
       - id: check-added-large-files
-        always_run: true
-
       - id: detect-private-key
-        always_run: true
 
   - repo: https://github.com/bwhmather/ssort
     rev: 0.14.0
@@ -50,11 +29,18 @@ repos:
         entry: ssort
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.3
+    rev: v0.9.9
     hooks:
       - id: ruff
         args: [ --fix ]
       - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.15.0
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-pyyaml
 
   - repo: local
     hooks:

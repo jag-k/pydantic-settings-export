@@ -1,5 +1,6 @@
 import warnings
 from pathlib import Path
+from typing import Optional, Union
 
 from pydantic_settings import BaseSettings
 
@@ -15,8 +16,8 @@ class Exporter:
 
     def __init__(
         self,
-        settings: PSESettings | None = None,
-        generators: list[AbstractGenerator] | None = None,
+        settings: Optional[PSESettings] = None,
+        generators: Optional[list[AbstractGenerator]] = None,
     ) -> None:
         self.settings: PSESettings = settings or PSESettings()
         if generators is None:
@@ -28,7 +29,7 @@ class Exporter:
                     warnings.warn(f"Failed to initialize generator {generator_class.__name__}: {e}", stacklevel=2)
         self.generators: list[AbstractGenerator] = generators
 
-    def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
+    def run_all(self, *settings: Union[BaseSettings, type[BaseSettings]]) -> list[Path]:
         """Run all generators for the given settings.
 
         :param settings: The settings to generate documentation for.
