@@ -49,7 +49,7 @@ Create Markdown docs, `.env.example` files, and more with minimal configuration.
 
 ## 📋 Requirements
 
-- Python 3.11 or higher
+- Python 3.9 or higher
 - pydantic >= 2.7
 - pydantic-settings >= 2.3
 
