@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from pydantic_settings_export.sources import TomlSettings
@@ -41,12 +41,15 @@ class PSESettings(TomlSettings):
 
     root_dir: Path = Field(
         Path.cwd(),
-        description="The project directory. Used for relative paths in the configuration file and .env file.",
+        description=(
+            "The project directory. Used for relative paths in the configuration file and .env file. "
+            "If not set, will be the same as project_dir."
+        ),
     )
 
     project_dir: Path = Field(
         Path.cwd(),
-        description="The project directory. Used for relative paths in the configuration file and .env file.",
+        description="The project directory. Used for importing settings.",
     )
 
     relative_to: RelativeToSettings = Field(
@@ -54,3 +57,13 @@ class PSESettings(TomlSettings):
         description="The relative directory settings.",
     )
     respect_exclude: bool = Field(True, description="Respect the exclude attribute in the fields.")
+
+    @classmethod
+    @model_validator(mode="before")
+    def default_for_root_dir(cls, data: dict) -> dict:
+        """Set the default value for root_dir if not set."""
+        if isinstance(data, dict):
+            project_dir = data.get("project_dir", None)
+            if project_dir is not None:
+                data.setdefault("root_dir", project_dir)
+        return data

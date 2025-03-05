@@ -1,8 +1,9 @@
 import importlib.util
+import sys
 import warnings
-from enum import StrEnum
+from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Self, TypedDict, cast
+from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -10,6 +11,12 @@ from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
 from .abstract import AbstractGenerator, BaseGeneratorSettings
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
+
 
 if TYPE_CHECKING:
     from text_region_parser import RegionConstructor
@@ -24,10 +31,14 @@ class TableRowDict(TypedDict):
     Type: str
     Default: str
     Description: str
-    Example: str | None
+    Example: Optional[str]
 
 
-TableHeadersEnum = StrEnum("TableHeaders", [(h, h) for h in TableRowDict.__annotations__.keys()])
+TableHeadersEnum = Enum(  # type: ignore[misc]
+    "TableHeaders",
+    [(h, h) for h in TableRowDict.__annotations__.keys()],
+    type=str,
+)
 TableHeaders: list[TableHeadersEnum] = list(TableHeadersEnum.__members__.values())
 UNION_SEPARATOR = " \\| "
 
@@ -79,7 +90,7 @@ class MarkdownSettings(BaseGeneratorSettings):
         ),
         examples=[[TableHeadersEnum["Name"], TableHeadersEnum["Description"]]],
     )
-    table_only: bool | Literal["with-header"] = Field(
+    table_only: Union[bool, Literal["with-header"]] = Field(
         False,
         description=(
             "Only generate the table of the ALL settings (including sub-settings).\n"
@@ -88,7 +99,7 @@ class MarkdownSettings(BaseGeneratorSettings):
         examples=[True, False, "with-header"],
     )
 
-    region: str | Literal[False] = Field(
+    region: Union[str, Literal[False]] = Field(
         False,
         description=(
             "The region to use for the table of the ALL settings (including sub-settings).\n"
@@ -151,7 +162,7 @@ def _make_table_row(
     if not field.is_required:
         default = q(field.default)
 
-    example: str | None = None
+    example: Optional[str] = None
     if field.examples:
         example = ", ".join(q(example) for example in field.examples)
     types = UNION_SEPARATOR.join(q(t) for t in field.types)
@@ -160,20 +171,22 @@ def _make_table_row(
         Name=name,
         Type=types,
         Default=default,
-        Description=field.description,
+        Description=field.description or "",
         Example=example,
     )
 
 
-class MarkdownGenerator(AbstractGenerator):
+class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
     """The Markdown configuration file generator."""
 
     name = "markdown"
     config = MarkdownSettings
-    generator_config: MarkdownSettings
 
     def _make_table(self, rows: list[TableRowDict]) -> str:
-        return make_pretty_md_table_from_dict(rows, headers=[h.value for h in self.generator_config.table_headers])
+        return make_pretty_md_table_from_dict(
+            cast(list[dict[str, Optional[str]]], rows),
+            headers=[h.value for h in self.generator_config.table_headers],
+        )
 
     @staticmethod
     def _process_region(path: Path, constructor: "RegionConstructor") -> bool:
@@ -216,7 +229,7 @@ class MarkdownGenerator(AbstractGenerator):
 
 
         :param settings_info: Settings model to document.
-        :param level: Header nesting level (h1, h2, etc).
+        :param level: Header nesting level (h1, h2, etc.).
         :return: Formatted Markdown documentation.
         """
         # Generate header

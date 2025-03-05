@@ -2,7 +2,7 @@ import argparse
 import importlib
 import sys
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Optional, Union
 
 from pydantic import ImportString, TypeAdapter
 from pydantic_core import ValidationError
@@ -45,7 +45,7 @@ def make_pretty_md_table(headers: list[str], rows: list[list[str]]) -> str:  # n
     return result
 
 
-def make_pretty_md_table_from_dict(data: list[dict[str, str | None]], headers: list[str] | None = None) -> str:
+def make_pretty_md_table_from_dict(data: list[dict[str, Optional[str]]], headers: Optional[list[str]] = None) -> str:
     """Make a pretty Markdown table with column alignment from a list of dictionaries.
 
     :param data: The rows of the table as dictionaries.
@@ -68,7 +68,7 @@ def make_pretty_md_table_from_dict(data: list[dict[str, str | None]], headers: l
     return make_pretty_md_table(headers, rows)
 
 
-def q(s: str) -> str:
+def q(s: Any) -> str:
     """Add quotes around the string."""
     return f"`{s}`"
 
@@ -94,7 +94,7 @@ class ObjectImportAction(argparse.Action):
         builtin_generators = AbstractGenerator.generators()
         builtin_generator_names = {g.__name__: g for g in builtin_generators.values()}
 
-        obj: AbstractGenerator | None = builtin_generators.get(value, None)
+        obj: Optional[type[AbstractGenerator]] = builtin_generators.get(value, None)
         if obj:
             return obj
 
@@ -121,8 +121,8 @@ class ObjectImportAction(argparse.Action):
         self,
         parser: argparse.ArgumentParser,
         namespace: argparse.Namespace,
-        values: str | Sequence[Any] | None,
-        option_string: str | None = None,
+        values: Optional[Union[str, Sequence[Any]]],
+        option_string: Optional[str] = None,
     ) -> None:
         """Import the object from the module."""
         if values is None:
@@ -156,11 +156,12 @@ class ObjectImportAction(argparse.Action):
 class MissingSettingsError(ValueError):
     """Raised when the settings are missing."""
 
-    def __init__(self, missing: dict[str | int, str], settings_path: str = "Settings") -> None:
+    def __init__(self, missing: dict[Union[str, int], str], settings_path: str = "Settings") -> None:
         missing_as_str = "\n".join(
-            f"  - `{k if '.' in k else settings_path + '.' + k}`: {v}"
+            f"  - `{key if '.' in key else settings_path + '.' + key}`: {v}"
             #
             for k, v in missing.items()
+            if (key := str(k))
         )
         super().__init__(
             f"You have {len(missing)} missing settings:\n{missing_as_str}\n\n"
@@ -175,7 +176,7 @@ def import_settings_from_string(value: str) -> BaseSettings:
     try:
         obj = TypeAdapter(ImportString).validate_python(value)
     except ValidationError as err:
-        missing: dict[str | int, str] = {}
+        missing: dict[Union[str, int], str] = {}
         for details in err.errors():
             if details["type"] == "missing":
                 missing[details["loc"][0]] = details["msg"]

@@ -5,8 +5,7 @@ import warnings
 from collections.abc import Iterable, Sequence
 from inspect import isclass
 from pathlib import Path
-from tomllib import load
-from typing import Any, TextIO
+from typing import Any, Optional, TextIO, cast
 
 from dotenv import dotenv_values, load_dotenv
 from pydantic import Field, SkipValidation, model_validator
@@ -20,6 +19,12 @@ from pydantic_settings_export.settings import PSESettings
 from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
 from pydantic_settings_export.version import __version__
 
+if sys.version_info < (3, 11):
+    from tomli import load as toml_load
+else:
+    from tomllib import load as toml_load
+
+
 CDW = Path.cwd()
 
 
@@ -28,7 +33,7 @@ def _make_project_name(default_name: str) -> str:
     try:
         if self_pyproject_file.is_file():
             with self_pyproject_file.open("rb") as f:
-                project_name: str | None = load(f).get("project", {}).get("name", None)
+                project_name: Optional[str] = toml_load(f).get("project", {}).get("name", None)
                 if not project_name:
                     warnings.warn(
                         f"Project name not found in {self_pyproject_file}! Will be used {default_name!r}",
@@ -48,7 +53,7 @@ Generators = AbstractGenerator.create_generator_config_model(multiple_for_single
 class PSECLISettings(PSESettings):
     """The settings for the CLI."""
 
-    generators: Generators = Field(
+    generators: Generators = Field(  # type: ignore[valid-type]
         default_factory=Generators,
         description="The configuration of generators.",
         exclude=True,
@@ -60,7 +65,7 @@ class PSECLISettings(PSESettings):
         exclude=True,
     )
 
-    env_file: Path | None = Field(
+    env_file: Optional[Path] = Field(
         None,
         description=(
             "The path to the .env file to load environment variables. "
@@ -125,7 +130,7 @@ class PSECLISettings(PSESettings):
         """Get the generators."""
         all_generators = AbstractGenerator.generators()
         result = []
-        for name, gen_configs in self.generators:
+        for name, gen_configs in self.generators:  # type: ignore[attr-defined]  # Is __iter__ really exist?
             for gen_config in gen_configs:
                 g = all_generators.get(name)
                 if not g:
@@ -161,7 +166,7 @@ def _generators_help(generators_list: list[type[AbstractGenerator]]) -> str:
     s = PSESettings()
     return SimpleGenerator(s).generate(
         *(
-            SettingsInfoModel.from_settings_model(g.config, s)
+            SettingsInfoModel.from_settings_model(cast(type[BaseSettings], g.config), s)
             # Get all available generators
             for g in generators_list
         ),
@@ -298,7 +303,7 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
             warnings.warn(f"Environment file {env_file.name} does not exist", stacklevel=2)
             continue
         try:
-            os.environ.update(dotenv_values(stream=env_file))
+            os.environ.update({k: v for k, v in dotenv_values(stream=env_file).items() if v})
         except ValueError as e:
             warnings.warn(f"Invalid format in environment file {env_file.name}: {e}", stacklevel=2)
         except OSError as e:
@@ -308,8 +313,8 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
 
 
 def _setup_settings(
-    config_file: Path | None = None,
-    project_dir: Path | None = None,
+    config_file: Optional[Path] = None,
+    project_dir: Optional[Path] = None,
 ) -> PSECLISettings:
     """Initialize and configure PSECLISettings.
 
@@ -327,7 +332,7 @@ def _setup_settings(
     return s
 
 
-def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) -> list[type[AbstractGenerator]]:
+def _process_generators(generators: Sequence[Optional[type[AbstractGenerator]]]) -> list[type[AbstractGenerator]]:
     """Process and validate generator arguments.
 
     :param generators: Sequence of generator classes
@@ -342,7 +347,7 @@ def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) ->
     return result
 
 
-def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
+def main(parse_args: Optional[Sequence[str]] = None) -> None:  # noqa: D103
     parser = make_parser()
     args: argparse.Namespace = parser.parse_args(parse_args)
 
@@ -369,7 +374,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     try:
         result = exporter.run_all(*settings)
     except Exception as e:
-        parser.exit(1, f"Failed to initialize exporter: {e}\n")
+        parser.exit(2, f"Failed to initialize exporter: [{e.__class__.__name__}] {e}\n")
 
     if result:
         files = "\n".join(f"- {r}" for r in result)

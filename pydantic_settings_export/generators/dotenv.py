@@ -1,12 +1,18 @@
+import sys
 import warnings
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal, Optional
 
 from pydantic import ConfigDict, Field, model_validator
 
 from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
 
 from .abstract import AbstractGenerator, BaseGeneratorSettings
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 __all__ = ("DotEnvGenerator",)
 
@@ -31,7 +37,7 @@ class DotEnvSettings(BaseGeneratorSettings):
 
     model_config = ConfigDict(title="Generator: dotenv File Settings")
 
-    name: Path | None = Field(
+    name: Optional[Path] = Field(
         None,
         description="The name of the .env file.",
         examples=[
@@ -72,12 +78,11 @@ class DotEnvSettings(BaseGeneratorSettings):
         return self
 
 
-class DotEnvGenerator(AbstractGenerator):
+class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
     """The .env example generator."""
 
     name = "dotenv"
     config = DotEnvSettings
-    generator_config: DotEnvSettings
 
     def _process_field(
         self,
@@ -85,7 +90,7 @@ class DotEnvGenerator(AbstractGenerator):
         field: FieldInfoModel,
         is_optional: bool,
         is_required: bool,
-    ) -> str | None:
+    ) -> Optional[str]:
         """Process a field and return the string to add to the .env file.
 
         :param settings_info: The settings info model.
@@ -113,7 +118,7 @@ class DotEnvGenerator(AbstractGenerator):
             field_string += "  # " + (", ".join(field.examples))
         return field_string
 
-    def generate_single(self, settings_info: SettingsInfoModel, level=1) -> str:
+    def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:
         """Generate a .env example for a pydantic settings class.
 
         Creates a formatted .env file with:
