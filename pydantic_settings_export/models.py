@@ -56,6 +56,17 @@ def _prepare_example(example: Any, value_type: Optional[type] = None) -> str:
     return value_to_jsonable(example, value_type)
 
 
+def _alias_path_to_str(value: Union[AliasPath, str]) -> str:
+    """Convert an AliasPath or string to its string representation.
+
+    :param value: The AliasPath or string to convert
+    :return: String representation of the path
+    """
+    if isinstance(value, AliasPath):
+        return ".".join(map(str, value.path))
+    return value
+
+
 P = TypeVar("P", bound=Path)
 
 
@@ -204,11 +215,6 @@ class FieldInfoModel(BaseModel):
         validation_alias: Optional[Union[str, AliasChoices, AliasPath]] = field.validation_alias
         if field.alias:
             aliases = [field.alias]
-
-        def _alias_path_to_str(value: Union[AliasPath, str]) -> str:
-            if isinstance(value, AliasPath):
-                return ".".join(map(str, value.path))
-            return value
 
         if validation_alias:
             if isinstance(validation_alias, str):
