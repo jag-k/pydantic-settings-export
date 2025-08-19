@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, create_model
 
 from pydantic_settings_export.settings import PSESettings
 
-if sys.version_info < (3, 11):
+if sys.version_info < (3, 10):
     from typing_extensions import TypeAlias
 else:
     from typing import TypeAlias
