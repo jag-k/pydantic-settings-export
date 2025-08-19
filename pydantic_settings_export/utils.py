@@ -28,8 +28,10 @@ def make_pretty_md_table(headers: list[str], rows: list[list[str]]) -> str:  # n
     """
     col_sizes = [len(h) for h in headers]
 
-    # Escape pipes in the cells to avoid table formatting issues
-    rows = [[MARKDOWN_PIPE_RE.sub(r"\\|", r) for r in row] for row in rows]
+    # Escape pipes in the cells to avoid table formatting issues (be None-safe)
+    rows = [
+        [MARKDOWN_PIPE_RE.sub(r"\\|", cell) if isinstance(cell, str) else "" for cell in row] for row in rows if row
+    ]
 
     for row in rows:
         for i, cell in enumerate(row):
