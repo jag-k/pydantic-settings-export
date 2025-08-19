@@ -40,7 +40,7 @@ TableHeadersEnum = Enum(  # type: ignore[misc]
     type=str,
 )
 TableHeaders: list[TableHeadersEnum] = list(TableHeadersEnum.__members__.values())
-UNION_SEPARATOR = " \\| "
+UNION_SEPARATOR = " | "
 
 
 class MarkdownSettings(BaseGeneratorSettings):

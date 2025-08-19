@@ -1,5 +1,6 @@
 import argparse
 import importlib
+import re
 import sys
 from collections.abc import Sequence
 from typing import Any, Optional, Union
@@ -15,6 +16,8 @@ __all__ = (
     "make_pretty_md_table_from_dict",
 )
 
+MARKDOWN_PIPE_RE = re.compile(r"(?<!\\)\|")
+
 
 def make_pretty_md_table(headers: list[str], rows: list[list[str]]) -> str:  # noqa: C901
     """Make a pretty Markdown table with column alignment.
@@ -24,6 +27,10 @@ def make_pretty_md_table(headers: list[str], rows: list[list[str]]) -> str:  # n
     :return: The prettied Markdown table.
     """
     col_sizes = [len(h) for h in headers]
+
+    # Escape pipes in the cells to avoid table formatting issues
+    rows = [[MARKDOWN_PIPE_RE.sub(r"\\|", r) for r in row] for row in rows]
+
     for row in rows:
         for i, cell in enumerate(row):
             if cell is None:
