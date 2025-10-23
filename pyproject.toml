@@ -52,6 +52,9 @@ email = [
 regions = [
     "text-region-parser>=0.1.1",
 ]
+toml = [
+    "tomlkit>=0.12.0",
+]
 
 [dependency-groups]
 dev = [
@@ -63,6 +66,7 @@ dev = [
 ]
 tests = [
     "pytest>=8.3.3",
+    "pytest-coverage>=0.0",
 ]
 
 [build-system]
@@ -226,4 +230,23 @@ file_prefix = "Injected Configuration. Just a table."
 region = "config"
 paths = [
     "examples/InjectedConfiguration.md",
+]
+
+[[tool.pydantic_settings_export.generators.toml]]
+paths = [
+    "examples/config.example.toml",
+]
+include_comments = true
+include_types = true
+comment_defaults = true
+mode = "all"
+use_sections = true
+include_header = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "@pytest.mark.skip",
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "except ImportError",
 ]

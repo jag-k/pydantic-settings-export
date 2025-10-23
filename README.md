@@ -26,6 +26,7 @@ Create Markdown docs, `.env.example` files, and more with minimal configuration.
 - 📝 Documentation Generation
     - Markdown with tables and descriptions
     - Environment files (`.env.example`)
+    - TOML configuration files with comments
     - Support for region injection in existing files
     - Customizable output formats
 
@@ -59,16 +60,19 @@ Optional dependencies (aka `extras`):
     - Required for `pydantic.EmailStr` type.
 - `regions` -- for Markdown region insertion support (`text-region-parser >= 0.1.1`).
     - Required for Markdown generator with `region` option.
+- `toml` -- for TOML configuration file generation (`tomlkit >= 0.12.0`).
+    - Required for TOML generator.
 
 Install with optional dependencies:
 
 ```bash
 # Install with all optional dependencies
-pip install "pydantic-settings-export[email,regions]"  # Install with all extras
+pip install "pydantic-settings-export[email,regions,toml]"  # Install with all extras
 
 # Install with specific optional dependency
 pip install "pydantic-settings-export[email]"  # Install with email extra
 pip install "pydantic-settings-export[regions]"  # Install with regions extra
+pip install "pydantic-settings-export[toml]"  # Install with toml extra
 ```
 
 ## 🚀 Quick Start
@@ -226,6 +230,11 @@ paths = ["docs/settings.md"]
 # Generate .env example
 [[tool.pydantic_settings_export.generators.dotenv]]
 paths = [".env.example"]
+
+# Generate TOML config example
+[[tool.pydantic_settings_export.generators.toml]]
+paths = ["config.example.toml"]
+comment_defaults = true  # Comment out fields with default values
 ```
 
 For advanced configuration options, see our [Configuration Guide][gh-wiki/config].
@@ -244,6 +253,10 @@ See real-world examples of different output formats:
 - [Configuration.md](examples/Configuration.md) - Full configuration documentation with tables and descriptions
 - [SimpleConfiguration.md](examples/SimpleConfiguration.md) - Basic table-only configuration
 - [InjectedConfiguration.md](examples/InjectedConfiguration.md) - Configuration injected into an existing file
+
+### Configuration Files
+
+- [config.example.toml](examples/config.example.toml) - TOML configuration file with comments and type information
 
 ## 📚 Learn More
 

@@ -126,6 +126,22 @@ def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     return default
 
 
+def _unwrap_union_type(annotation: Any) -> Any:
+    """Extract the non-None type from a Union type annotation.
+
+    Handles both Union[Type, None] and Type | None syntax.
+    If the annotation is not a Union or doesn't contain a non-None type,
+    returns the original annotation.
+    """
+    origin = get_origin(annotation)
+    if origin in UnionTypes:
+        args = get_args(annotation)
+        non_none_args = [arg for arg in args if arg is not type(None)]
+        if non_none_args:
+            return non_none_args[0]
+    return annotation
+
+
 class FieldInfoModel(BaseModel):
     """Info about the field of the settings model."""
 
@@ -241,6 +257,7 @@ class SettingsInfoModel(BaseModel):
     name: str = Field(..., description="The name of the settings model.")
     docs: str = Field("", description="The documentation of the settings model.")
     env_prefix: str = Field("", description="The prefix of the environment variables.")
+    field_name: str = Field("", description="The original field name (for child settings).")
     fields: list[FieldInfoModel] = Field(default_factory=list, description="The fields of the settings model.")
     child_settings: list["SettingsInfoModel"] = Field(
         default_factory=list, description="The child settings of the settings model."
@@ -253,6 +270,7 @@ class SettingsInfoModel(BaseModel):
         global_settings: PSESettings | None = None,
         prefix: str = "",
         nested_delimiter: str = "_",
+        field_name: str = "",
     ) -> Self:
         """Generate the SettingsInfoModel using a settings model.
 
@@ -260,6 +278,7 @@ class SettingsInfoModel(BaseModel):
         :param global_settings: The global settings.
         :param prefix: The prefix of the environment variables.
         :param nested_delimiter: The delimiter to use for nested settings.
+        :param field_name: The original field name (for child settings).
         :return: Instance of SettingsInfoModel.
         """
         conf = settings.model_config
@@ -275,7 +294,8 @@ class SettingsInfoModel(BaseModel):
         for name, field_info in fields_info.items():
             if global_settings and global_settings.respect_exclude and field_info.exclude:
                 continue
-            annotation = field_info.annotation
+
+            annotation = _unwrap_union_type(field_info.annotation)
             if isinstance(annotation, GenericAlias):
                 annotation = annotation.__origin__
 
@@ -290,6 +310,7 @@ class SettingsInfoModel(BaseModel):
                         # We need to change the prefix to uppercase to match the env prefix
                         prefix=f"{prefix}{name}{nested_delimiter}".upper(),
                         nested_delimiter=nested_delimiter,
+                        field_name=name,
                     )
                 )
                 continue
@@ -312,4 +333,11 @@ class SettingsInfoModel(BaseModel):
             # Otherwise, get the class name from the settings model
             or str(settings.__class__.__name__)
         )
-        return cls(name=settings_name, docs=docs, env_prefix=prefix, fields=fields, child_settings=child_settings)
+        return cls(
+            name=settings_name,
+            docs=docs,
+            env_prefix=prefix,
+            field_name=field_name,
+            fields=fields,
+            child_settings=child_settings,
+        )

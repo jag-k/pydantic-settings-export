@@ -46,13 +46,13 @@ class AbstractGenerator(ABC, Generic[C]):
 
     ALL_GENERATORS: ClassVar[list[type["AbstractGenerator"]]] = []
 
-    def __init__(self, settings: PSESettings, generator_config: C | None = None) -> None:
+    def __init__(self, settings: PSESettings | None = None, generator_config: C | None = None) -> None:
         """Initialize the AbstractGenerator.
 
         :param settings: The settings for the generator.
         """
-        self.settings = settings
-        self.generator_config: C = generator_config if generator_config else cast(C, self.config())
+        self.settings = settings or PSESettings()
+        self.generator_config: C = generator_config if generator_config is not None else cast(C, self.config())
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Initialize the subclass."""
