@@ -3,7 +3,7 @@ import sys
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import GenericAlias
-from typing import TYPE_CHECKING, Any, ForwardRef, Literal, Optional, TypeVar, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, ForwardRef, Literal, TypeVar, Union, cast, get_args, get_origin
 
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, TypeAdapter
 from pydantic.fields import FieldInfo
@@ -39,7 +39,7 @@ BASE_SETTINGS_DOCS = (getdoc(BaseSettings) or "").strip()
 BASE_MODEL_DOCS = (getdoc(BaseModel) or "").strip()
 
 
-def value_to_jsonable(value: Any, value_type: Optional[type] = None) -> Any:
+def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
     if value_type is None:
         value_type = type(value)
 
@@ -49,14 +49,14 @@ def value_to_jsonable(value: Any, value_type: Optional[type] = None) -> Any:
         return str(value)
 
 
-def _prepare_example(example: Any, value_type: Optional[type] = None) -> str:
+def _prepare_example(example: Any, value_type: type | None = None) -> str:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
     return value_to_jsonable(example, value_type)
 
 
-def _alias_path_to_str(value: Union[AliasPath, str]) -> str:
+def _alias_path_to_str(value: AliasPath | str) -> str:
     """Convert an AliasPath or string to its string representation.
 
     :param value: The AliasPath or string to convert
@@ -103,7 +103,7 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
     return [FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")]
 
 
-def default_path(default: P, global_settings: Optional[PSESettings] = None) -> P:
+def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     # Check if default is a Path and is absolute
     if default.is_absolute():
         # if we need to replace absolute paths
@@ -133,8 +133,8 @@ class FieldInfoModel(BaseModel):
 
     name: str = Field(..., description="The name of the field.")
     types: list[str] = Field(..., description="The type of the field.")
-    default: Optional[str] = Field(None, description="The default value of the field as a string.")
-    description: Optional[str] = Field(None, description="The description of the field.")
+    default: str | None = Field(None, description="The default value of the field as a string.")
+    description: str | None = Field(None, description="The description of the field.")
     examples: list[str] = Field(default_factory=list, description="The examples of the field.")
     aliases: list[str] = Field(default_factory=list, description="The aliases of the field.")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
@@ -154,14 +154,14 @@ class FieldInfoModel(BaseModel):
         return bool(self.examples and self.examples != [self.default])
 
     @staticmethod
-    def create_default(field: FieldInfo, global_settings: Optional[PSESettings] = None) -> Optional[str]:
+    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
         """Make the default value for the field.
 
         :param field: The field info to generate the default value for.
         :param global_settings: The global settings.
         :return: The default value for the field as a string, or None if there is no default value.
         """
-        default: Union[object, PydanticUndefined] = field.default  # type: ignore[valid-type]
+        default: object | PydanticUndefined = field.default  # type: ignore[valid-type]
 
         if default is PydanticUndefined and field.default_factory:
             default = field.default_factory()
@@ -183,7 +183,7 @@ class FieldInfoModel(BaseModel):
         cls,
         name: str,
         field: FieldInfo,
-        global_settings: Optional[PSESettings] = None,
+        global_settings: PSESettings | None = None,
     ) -> Self:
         """Generate FieldInfoModel using name and field.
 
@@ -202,7 +202,7 @@ class FieldInfoModel(BaseModel):
         # Get the default value from the field if it exists
         default = cls.create_default(field, global_settings)
         # Get the description from the field if it exists
-        description: Optional[str] = field.description or None
+        description: str | None = field.description or None
         # Get the example from the field if it exists
         examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
         if not examples and default:
@@ -212,7 +212,7 @@ class FieldInfoModel(BaseModel):
 
         # Get the aliases from the field if it exists
         aliases: list[str] = []
-        validation_alias: Optional[Union[str, AliasChoices, AliasPath]] = field.validation_alias
+        validation_alias: str | AliasChoices | AliasPath | None = field.validation_alias
         if field.alias:
             aliases = [field.alias]
 
@@ -249,8 +249,8 @@ class SettingsInfoModel(BaseModel):
     @classmethod
     def from_settings_model(
         cls,
-        settings: Union[BaseSettings, type[BaseSettings]],
-        global_settings: Optional[PSESettings] = None,
+        settings: BaseSettings | type[BaseSettings],
+        global_settings: PSESettings | None = None,
         prefix: str = "",
         nested_delimiter: str = "_",
     ) -> Self:

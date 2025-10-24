@@ -1,16 +1,10 @@
-import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, Optional, TypeVar, cast, final
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar, cast, final
 
 from pydantic import BaseModel, Field, create_model
 
 from pydantic_settings_export.settings import PSESettings
-
-if sys.version_info < (3, 10):
-    from typing_extensions import TypeAlias
-else:
-    from typing import TypeAlias
 
 if TYPE_CHECKING:
     from pydantic_settings_export.models import SettingsInfoModel
@@ -52,7 +46,7 @@ class AbstractGenerator(ABC, Generic[C]):
 
     ALL_GENERATORS: ClassVar[list[type["AbstractGenerator"]]] = []
 
-    def __init__(self, settings: PSESettings, generator_config: Optional[C] = None) -> None:
+    def __init__(self, settings: PSESettings, generator_config: C | None = None) -> None:
         """Initialize the AbstractGenerator.
 
         :param settings: The settings for the generator.
@@ -149,7 +143,7 @@ class AbstractGenerator(ABC, Generic[C]):
         """
 
         def _make_arg(generator: type[AbstractGenerator]) -> tuple[Any, Any]:
-            config: Optional[type[BaseGeneratorSettings]] = getattr(generator, "config", None)
+            config: type[BaseGeneratorSettings] | None = getattr(generator, "config", None)
             if config is None:
                 raise ValueError(f"Generator {generator.name} has no config")
 

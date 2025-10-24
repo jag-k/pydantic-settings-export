@@ -3,7 +3,7 @@ import sys
 import warnings
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -31,7 +31,7 @@ class TableRowDict(TypedDict):
     Type: str
     Default: str
     Description: str
-    Example: Optional[str]
+    Example: str | None
 
 
 TableHeadersEnum = Enum(  # type: ignore[misc]
@@ -90,7 +90,7 @@ class MarkdownSettings(BaseGeneratorSettings):
         ),
         examples=[[TableHeadersEnum["Name"], TableHeadersEnum["Description"]]],
     )
-    table_only: Union[bool, Literal["with-header"]] = Field(
+    table_only: bool | Literal["with-header"] = Field(
         False,
         description=(
             "Only generate the table of the ALL settings (including sub-settings).\n"
@@ -99,7 +99,7 @@ class MarkdownSettings(BaseGeneratorSettings):
         examples=[True, False, "with-header"],
     )
 
-    region: Union[str, Literal[False]] = Field(
+    region: str | Literal[False] = Field(
         False,
         description=(
             "The region to use for the table of the ALL settings (including sub-settings).\n"
@@ -162,7 +162,7 @@ def _make_table_row(
     if not field.is_required:
         default = q(field.default)
 
-    example: Optional[str] = None
+    example: str | None = None
     if field.examples:
         example = ", ".join(q(example) for example in field.examples)
     types = UNION_SEPARATOR.join(q(t) for t in field.types)
@@ -184,7 +184,7 @@ class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
 
     def _make_table(self, rows: list[TableRowDict]) -> str:
         return make_pretty_md_table_from_dict(
-            cast(list[dict[str, Optional[str]]], rows),
+            cast(list[dict[str, str | None]], rows),
             headers=[h.value for h in self.generator_config.table_headers],
         )
 

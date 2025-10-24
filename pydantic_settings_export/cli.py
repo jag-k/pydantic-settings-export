@@ -5,7 +5,7 @@ import warnings
 from collections.abc import Iterable, Sequence
 from inspect import isclass
 from pathlib import Path
-from typing import Any, Optional, TextIO, cast
+from typing import Any, TextIO, cast
 
 from dotenv import dotenv_values, load_dotenv
 from pydantic import Field, SkipValidation, model_validator
@@ -33,7 +33,7 @@ def _make_project_name(default_name: str) -> str:
     try:
         if self_pyproject_file.is_file():
             with self_pyproject_file.open("rb") as f:
-                project_name: Optional[str] = toml_load(f).get("project", {}).get("name", None)
+                project_name: str | None = toml_load(f).get("project", {}).get("name", None)
                 if not project_name:
                     warnings.warn(
                         f"Project name not found in {self_pyproject_file}! Will be used {default_name!r}",
@@ -65,7 +65,7 @@ class PSECLISettings(PSESettings):
         exclude=True,
     )
 
-    env_file: Optional[Path] = Field(
+    env_file: Path | None = Field(
         None,
         description=(
             "The path to the .env file to load environment variables. "
@@ -313,8 +313,8 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
 
 
 def _setup_settings(
-    config_file: Optional[Path] = None,
-    project_dir: Optional[Path] = None,
+    config_file: Path | None = None,
+    project_dir: Path | None = None,
 ) -> PSECLISettings:
     """Initialize and configure PSECLISettings.
 
@@ -332,7 +332,7 @@ def _setup_settings(
     return s
 
 
-def _process_generators(generators: Sequence[Optional[type[AbstractGenerator]]]) -> list[type[AbstractGenerator]]:
+def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) -> list[type[AbstractGenerator]]:
     """Process and validate generator arguments.
 
     :param generators: Sequence of generator classes
@@ -347,7 +347,7 @@ def _process_generators(generators: Sequence[Optional[type[AbstractGenerator]]])
     return result
 
 
-def main(parse_args: Optional[Sequence[str]] = None) -> None:  # noqa: D103
+def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     parser = make_parser()
     args: argparse.Namespace = parser.parse_args(parse_args)
 

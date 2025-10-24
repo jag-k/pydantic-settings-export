@@ -1,7 +1,7 @@
 import sys
 import warnings
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -37,7 +37,7 @@ class DotEnvSettings(BaseGeneratorSettings):
 
     model_config = ConfigDict(title="Generator: dotenv File Settings")
 
-    name: Optional[Path] = Field(
+    name: Path | None = Field(
         None,
         description="The name of the .env file.",
         examples=[
@@ -90,7 +90,7 @@ class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
         field: FieldInfoModel,
         is_optional: bool,
         is_required: bool,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Process a field and return the string to add to the .env file.
 
         :param settings_info: The settings info model.

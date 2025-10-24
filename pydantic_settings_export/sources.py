@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Optional
 
 from pydantic_settings import BaseSettings
 from pydantic_settings.sources import PathType, PydanticBaseSettingsSource, PyprojectTomlConfigSettingsSource
@@ -29,7 +28,7 @@ class TomlSettings(BaseSettings):
         :param file_secret_settings: The file secret settings source.
         :return: The customised sources.
         """
-        toml_file: Optional[PathType] = settings_cls.model_config.get("toml_file", None)
+        toml_file: PathType | None = settings_cls.model_config.get("toml_file", None)
         base_settings = (init_settings, env_settings, dotenv_settings, file_secret_settings)
         if not toml_file:
             return base_settings
