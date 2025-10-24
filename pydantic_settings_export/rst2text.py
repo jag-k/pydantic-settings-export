@@ -30,7 +30,7 @@ def rst_to_text(text: str, line_length: int = 80) -> str:
     """Remove RST syntax and wrap the docstring."""
 
     def is_code_block(text: str) -> bool:
-        return all(line.startswith("    ") for line in text.splitlines())
+        return all(not line or line.startswith("    ") for line in text.splitlines())
 
     def is_list(text: str) -> bool:
         return all(line.startswith("-") or line.startswith("  ") for line in text.splitlines())
