@@ -488,18 +488,16 @@ def test_toml_generator_with_section_depth() -> None:
 
 # Core
 
-core.smtp.host = "localhost"
-
 [core]
 # name: string
 # Default: "app"
 name = "app"
 
-
 # SMTP
 
-# core.smtp.host: string
+# smtp.host: string
 # Default: "localhost"
+smtp.host = "localhost"
 """
     assert result == expected
 
@@ -516,13 +514,12 @@ name = "app"
 # Default: "app"
 name = "app"
 
+# SMTP
+
 [core.smtp]
 # host: string
 # Default: "localhost"
 host = "localhost"
-
-
-# SMTP
 """
     assert result == expected
 
@@ -553,13 +550,12 @@ def test_toml_generator_with_deeply_nested_child_settings() -> None:
 # Default: "app"
 name = "app"
 
+# SMTP
+
 [core.smtp]
 # host: string
 # Default: "localhost"
 host = "localhost"
-
-
-# SMTP
 """
     assert result == expected
 
@@ -596,18 +592,35 @@ def test_toml_generator_creates_intermediate_tables() -> None:
 # Default: "root"
 name = "root"
 
+# Level2
+
+[level1.level2]
+# Level3
+
+[level1.level2.level3]
+# Level4
+
 [level1.level2.level3.level4]
 # value: string
 # Default: "deep"
 value = "deep"
+"""
+    assert result == expected
 
 
-# Level2
+def test_toml_generator_with_prefix(simple_settings: Any) -> None:
+    """Test TOML generation with prefix option."""
+    generator = TomlGenerator(generator_config=TomlSettings(prefix="tool.myapp"))
+    result = generator.generate(SettingsInfoModel.from_settings_model(simple_settings))
 
+    expected = """\
+# Settings
+# Test settings.
 
-# Level3
-
-
-# Level4
+[tool.myapp]
+# field: string
+# Field description
+# Default: "value"
+# field = "value"
 """
     assert result == expected

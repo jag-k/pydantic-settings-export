@@ -153,6 +153,16 @@ class TomlSettings(BaseGeneratorSettings):
         ),
     )
 
+    prefix: str | None = Field(
+        None,
+        description=(
+            "Prefix for all TOML sections. "
+            "All fields and sections will be nested under this prefix. "
+            "The prefix does not count towards section_depth."
+        ),
+        examples=["tool.myapp", "app.config"],
+    )
+
 
 class TomlGenerator(AbstractGenerator[TomlSettings]):
     """The TOML configuration file generator."""
@@ -269,17 +279,16 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
 
         container.add(nl())
 
-    def _add_child_as_dotted_keys(self, doc: Any, child: SettingsInfoModel, dotted_prefix: str) -> None:
+    def _add_child_as_dotted_keys(self, container: Any, child: SettingsInfoModel, dotted_prefix: str) -> None:
         """Add a child settings using dotted key syntax."""
-        self._add_header_comments(doc, child.name, child.docs)
+        self._add_header_comments(container, child.name, child.docs)
 
         for field in child.fields:
             if self._should_include_field(field):
-                self._add_field_to_container(doc, field, prefix=dotted_prefix)
+                self._add_field_to_container(container, field, prefix=dotted_prefix)
 
     def _add_settings_to_container(
         self,
-        root_doc: Any,
         container: Any,
         settings: SettingsInfoModel,
         current_depth: int = 0,
@@ -299,42 +308,54 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             )
 
             if use_section:
-                self._add_child_as_section(root_doc, container, child, child.field_name, next_depth, child_section_path)
+                self._add_child_as_section(container, child, child.field_name, next_depth, child_section_path)
             else:
-                dotted_prefix = f"{child_section_path}."
-                self._add_child_as_dotted_keys(root_doc, child, dotted_prefix)
+                dotted_prefix = f"{child.field_name}."
+                self._add_child_as_dotted_keys(container, child, dotted_prefix)
 
     def _add_child_as_section(
         self,
-        root_doc: Any,
-        parent: Any,
+        container: Any,
         child: SettingsInfoModel,
         section_name: str,
         current_depth: int = 1,
         section_path: str | None = None,
     ) -> None:
         """Add a child settings as a TOML section, including nested child settings recursively."""
-        self._add_header_comments(root_doc, child.name, child.docs)
+        self._add_header_comments(container, child.name, child.docs)
 
         section = table()
-        parent[section_name] = section
-        root_doc.add(nl())
+        container[section_name] = section
+        container.add(nl())
 
-        self._add_settings_to_container(root_doc, section, child, current_depth, section_path or section_name)
+        self._add_settings_to_container(section, child, current_depth, section_path or section_name)
+
+    def _create_prefix_section(self, doc: Any, prefix: str) -> Any:
+        """Create nested sections for a dotted prefix (e.g., 'tool.myapp')."""
+        parts = prefix.split(".")
+        current_section = doc
+
+        for part in parts:
+            new_section = table()
+            current_section[part] = new_section
+            current_section = new_section
+
+        doc.add(nl())
+        return current_section
 
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:
-        """Generate TOML configuration for a pydantic settings class.
-
-        Creates a formatted TOML file with:
-        - Comments for field descriptions, types, and examples
-        - Proper TOML data types and structure
-        - Nested sections for child settings
-        - Optional commenting of default values
-        """
+        """Generate TOML configuration for a pydantic settings class."""
         doc = document()
 
         self._add_header_comments(doc, settings_info.name or "", settings_info.docs)
-        self._add_settings_to_container(doc, doc, settings_info, current_depth=0)
+
+        if self.generator_config.prefix:
+            container = self._create_prefix_section(doc, self.generator_config.prefix)
+            self._add_settings_to_container(
+                container, settings_info, current_depth=0, section_path=self.generator_config.prefix
+            )
+        else:
+            self._add_settings_to_container(doc, settings_info, current_depth=0)
 
         result = tomlkit.dumps(doc)
         return re.sub(r"#\s+$", "#", result, flags=re.MULTILINE)
