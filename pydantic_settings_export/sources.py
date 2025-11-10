@@ -31,6 +31,9 @@ class TomlSettings(BaseSettings):
         toml_file: PathType | None = settings_cls.model_config.get("toml_file", None)
         base_settings = (init_settings, env_settings, dotenv_settings, file_secret_settings)
         if not toml_file:
+            settings_cls.model_config.pop("toml_file", None)
+            settings_cls.model_config.pop("pyproject_toml_table_header", None)
+            settings_cls.model_config.pop("pyproject_toml_depth", None)
             return base_settings
 
         if isinstance(toml_file, Sequence):

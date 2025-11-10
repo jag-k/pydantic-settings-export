@@ -44,7 +44,7 @@ def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
         value_type = type(value)
 
     try:
-        return TypeAdapter(value_type).dump_json(value).decode()
+        return TypeAdapter(value_type).dump_json(value, warnings="error").decode()
     except PydanticSerializationError:
         return str(value)
 
