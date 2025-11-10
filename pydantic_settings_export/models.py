@@ -279,6 +279,13 @@ class SettingsInfoModel(BaseModel):
             if isinstance(annotation, GenericAlias):
                 annotation = annotation.__origin__
 
+            origin = get_origin(annotation)
+            if origin in UnionTypes:
+                union_args = get_args(annotation)
+                non_none_args = [arg for arg in union_args if arg is not type(None)]
+                if len(non_none_args) == 1:
+                    annotation = non_none_args[0]
+
             # If the annotation is a BaseModel (also match to BaseSettings),
             # then we need to generate a SettingsInfoModel for it
             if isclass(annotation) and issubclass(annotation, (BaseModel, BaseSettings)):
