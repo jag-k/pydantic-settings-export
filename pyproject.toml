@@ -238,6 +238,14 @@ paths = [
 comment_defaults = true
 mode = "all"
 
+[[tool.pydantic_settings_export.generators.toml]]
+paths = [
+    "examples/pyproject.example.toml",
+]
+prefix="tool.pydantic_settings_export"
+comment_defaults = true
+mode = "all"
+
 [tool.coverage.report]
 exclude_lines = [
     "@pytest.mark.skip",

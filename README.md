@@ -257,6 +257,7 @@ See real-world examples of different output formats:
 ### Configuration Files
 
 - [config.example.toml](examples/config.example.toml) - TOML configuration file with comments and type information
+  > Note: You can use `prefix` to generate TOML for any custom format, like pyproject.toml.
 
 ## 📚 Learn More
 
@@ -316,7 +317,7 @@ We welcome contributions! Before contributing:
     - Domains: `fix` or `feature`.
     - Example: `feature/6-inject-config-to-markdown`.
 4. Make your changes
-5. Submit a PR with changelog in description
+5. Submit a PR with a changelog in description
 
 For complete guidelines, see our:
 
