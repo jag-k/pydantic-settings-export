@@ -116,6 +116,14 @@ class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
         if not field.is_required and not is_optional:
             return None
 
+        # If the field has an actual value (from an instance), show it with the default as comment
+        if field.has_value:
+            lines = []
+            if field.default is not None:
+                lines.append(f"# {field_name}={field.default}  # default")
+            lines.append(f"{field_name}={field.value}")
+            return "\n".join(lines)
+
         # Format optional fields with a comment prefix
         field_string = f"{field_name}="
         if not field.is_required and is_optional:

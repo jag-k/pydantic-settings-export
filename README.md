@@ -213,6 +213,30 @@ exporter.run_all(MySettings)
 
 This will generate documentation using all available generators. For custom configuration, see our [Wiki][gh-wiki].
 
+### Exporting Instances with actual values
+
+You can pass settings instances instead of classes to export their actual runtime values:
+
+```python
+from pydantic_settings import BaseSettings
+from pydantic_settings_export import Exporter
+
+
+class MySettings(BaseSettings):
+    debug: bool = False
+    api_url: str = "http://localhost"
+
+
+settings = MySettings(debug=True, api_url="https://api.example.com")
+exporter = Exporter()
+exporter.run_all(settings)
+```
+
+When exporting an instance:
+- Default values are shown as comments
+- Actual instance values are shown as active configuration
+- If a value equals its default, no duplication occurs
+
 ## Configuration
 
 Basic configuration in `pyproject.toml`:

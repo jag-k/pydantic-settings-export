@@ -151,6 +151,7 @@ class FieldInfoModel(BaseModel):
     name: str = Field(..., description="The name of the field.")
     types: list[str] = Field(..., description="The type of the field.")
     default: str | None = Field(None, description="The default value of the field as a string.")
+    value: str | None = Field(None, description="The actual value from an instance (JSON serialized).")
     description: str | None = Field(None, description="The description of the field.")
     examples: list[str] = Field(default_factory=list, description="The examples of the field.")
     aliases: list[str] = Field(default_factory=list, description="The aliases of the field.")
@@ -165,6 +166,11 @@ class FieldInfoModel(BaseModel):
     def is_required(self) -> bool:
         """Check if the field is required."""
         return self.default is None
+
+    @property
+    def has_value(self) -> bool:
+        """Check if the field has an actual value different from the default."""
+        return self.value is not None and self.value != self.default
 
     def has_examples(self) -> bool:
         """Check if the field has examples."""
@@ -195,18 +201,46 @@ class FieldInfoModel(BaseModel):
 
         return value_to_jsonable(default)
 
+    @staticmethod
+    def create_value(
+        instance: BaseSettings,
+        field_name: str,
+        global_settings: PSESettings | None = None,
+    ) -> str | None:
+        """Extract the actual value from an instance.
+
+        :param instance: The settings instance to extract the value from.
+        :param field_name: The name of the field.
+        :param global_settings: The global settings.
+        :return: The actual value as a JSON string, or None if not available.
+        """
+        value = getattr(instance, field_name, PydanticUndefined)
+
+        if value is PydanticUndefined:
+            return None
+
+        if isinstance(value, set):
+            value = sorted(value)
+
+        if isinstance(value, Path):
+            value = default_path(value, global_settings)
+
+        return value_to_jsonable(value)
+
     @classmethod
     def from_settings_field(
         cls,
         name: str,
         field: FieldInfo,
         global_settings: PSESettings | None = None,
+        instance: BaseSettings | None = None,
     ) -> Self:
         """Generate FieldInfoModel using name and field.
 
         :param name: The name of the field.
         :param field: The field info to generate FieldInfoModel from.
         :param global_settings: The global settings.
+        :param instance: Optional settings instance to extract actual values from.
         :return: Instance of FieldInfoModel.
         """
         # Parse the annotation of the field
@@ -216,8 +250,8 @@ class FieldInfoModel(BaseModel):
         name: str = name
         # Get the type from the FIELD_TYPE_MAP if it exists
         types: list[str] = get_type_by_annotation(annotation)
-        # Get the default value from the field if it exists
         default = cls.create_default(field, global_settings)
+        value = cls.create_value(instance, name, global_settings) if instance else None
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
@@ -245,6 +279,7 @@ class FieldInfoModel(BaseModel):
             name=name,
             types=types,
             default=default,
+            value=value,
             description=description,
             examples=examples,
             aliases=aliases,
@@ -282,10 +317,14 @@ class SettingsInfoModel(BaseModel):
         :param field_name: The original field name (for child settings).
         :return: Instance of SettingsInfoModel.
         """
+        is_instance = isinstance(settings, BaseSettings) and not isclass(settings)
+        instance: BaseSettings | None = settings if is_instance else None
+        settings_class: type[BaseSettings] = settings.__class__ if is_instance else settings  # type: ignore[assignment]
+
         conf = settings.model_config
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=PydanticDeprecationWarning)
-            fields_info = settings.model_fields
+            fields_info = settings_class.model_fields
 
         # If the settings are a BaseSettings, then we can get the prefix and nested delimiter from the model config
         if isinstance(settings, BaseSettings) or (isclass(settings) and issubclass(settings, BaseSettings)):
@@ -312,9 +351,10 @@ class SettingsInfoModel(BaseModel):
             # If the annotation is a BaseModel (also match to BaseSettings),
             # then we need to generate a SettingsInfoModel for it
             if isclass(annotation) and issubclass(annotation, (BaseModel, BaseSettings)):
+                child_instance = getattr(instance, name, None) if instance else None
                 child_settings.append(
                     cls.from_settings_model(
-                        cast(type[BaseSettings], annotation),
+                        child_instance if child_instance else cast(type[BaseSettings], annotation),
                         global_settings=global_settings,
                         # Add the prefix and nested delimiter to the child settings
                         # We need to change the prefix to uppercase to match the env prefix
@@ -325,7 +365,7 @@ class SettingsInfoModel(BaseModel):
                 )
                 continue
 
-            fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings))
+            fields.append(FieldInfoModel.from_settings_field(name, field_info, global_settings, instance))
 
         docs = getdoc(settings) or ""
 
