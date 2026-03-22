@@ -363,4 +363,6 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             self._add_settings_to_container(doc, settings_info, current_depth=0)
 
         result = tomlkit.dumps(doc)
-        return re.sub(r"#\s+$", "#", result, flags=re.MULTILINE)
+
+        result = re.sub(r"#\s+$", "#", result, flags=re.MULTILINE)
+        return result
