@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import ConfigDict, Field, model_validator
 
-from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
+from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, value_repr
 
 from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings
 
@@ -122,19 +122,19 @@ class DotEnvGenerator(AbstractEnvGenerator[DotEnvSettings]):
         # If the field has an actual value (from an instance), show it with the default as comment
         if field.has_value:
             lines = []
-            if field.default is not None:
-                lines.append(f"# {field_name}={field.default}  # default")
-            lines.append(f"{field_name}={field.value}")
+            if not field.is_required:
+                lines.append(f"# {field_name}={value_repr(field.default)}  # default")
+            lines.append(f"{field_name}={value_repr(field.value)}")
             return "\n".join(lines)
 
         # Format optional fields with a comment prefix
         field_string = f"{field_name}="
         if not field.is_required and is_optional:
-            field_string = f"# {field_name}={field.default}"
+            field_string = f"# {field_name}={value_repr(field.default)}"
 
         # Add examples as comments if available and enabled
-        if field.examples and field.examples != [field.default] and self.generator_config.add_examples:
-            field_string += "  # " + (", ".join(field.examples))
+        if field.has_examples() and self.generator_config.add_examples:
+            field_string += "  # " + ", ".join(value_repr(e) for e in field.examples)
         return field_string
 
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:

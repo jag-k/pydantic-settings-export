@@ -7,7 +7,14 @@ import pytest
 from pydantic import AliasChoices, AliasPath, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, get_type_by_annotation, value_to_jsonable
+from pydantic_settings_export.models import (
+    FieldInfoModel,
+    SettingsInfoModel,
+    format_types,
+    get_type_by_annotation,
+    type_repr,
+    value_to_jsonable,
+)
 
 # =============================================================================
 # Tests for value_to_jsonable
@@ -36,18 +43,18 @@ def test_value_to_jsonable(value: Any, expected: str) -> None:
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (str, ["string"]),
-        (int, ["integer"]),
-        (bool, ["boolean"]),
-        (float, ["number"]),
-        (list, ["array"]),
-        (list[str], ["array"]),
-        (dict, ["object"]),
-        (dict[str, int], ["object"]),
-        (None, ["null"]),
+        (str, [str]),
+        (int, [int]),
+        (bool, [bool]),
+        (float, [float]),
+        (list, [list]),
+        (list[str], [list]),
+        (dict, [dict]),
+        (dict[str, int], [dict]),
+        (None, [type(None)]),
     ],
 )
-def test_get_type_by_annotation_simple(value: type, expected: list[str]) -> None:
+def test_get_type_by_annotation_simple(value: type, expected: list[Any]) -> None:
     """Test getting type from simple annotations."""
     result = get_type_by_annotation(value)
     assert result == expected
@@ -56,16 +63,16 @@ def test_get_type_by_annotation_simple(value: type, expected: list[str]) -> None
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (Optional[str], ["string", "null"]),
-        (Union[str, int], ["string", "integer"]),
-        (Union[str, None], ["string", "null"]),
-        (str | None, ["string", "null"]),
-        (str | Path, ["string", "Path"]),
-        (str | str, ["string"]),
-        (str | Path | int | float | None, ["string", "Path", "integer", "number", "null"]),
+        (Optional[str], [str, type(None)]),
+        (Union[str, int], [str, int]),
+        (Union[str, None], [str, type(None)]),
+        (str | None, [str, type(None)]),
+        (str | Path, [str, Path]),
+        (str | str, [str]),
+        (str | Path | int | float | None, [str, Path, int, float, type(None)]),
     ],
 )
-def test_get_type_by_annotation_union(value: type, expected: list[str]) -> None:
+def test_get_type_by_annotation_union(value: type, expected: list[Any]) -> None:
     """Test getting type from Union-s annotation."""
     result = get_type_by_annotation(value)
     assert result == expected
@@ -74,11 +81,11 @@ def test_get_type_by_annotation_union(value: type, expected: list[str]) -> None:
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        (Literal["a", "b", 1], ['"a"', '"b"', "1"]),
-        (Literal[1, 2, 3], ["1", "2", "3"]),
+        (Literal["a", "b", 1], ["a", "b", 1]),
+        (Literal[1, 2, 3], [1, 2, 3]),
     ],
 )
-def test_get_type_by_annotation_literal(value: type, expected: list[str]) -> None:
+def test_get_type_by_annotation_literal(value: type, expected: list[Any]) -> None:
     """Test getting type from Literal annotation."""
     result = get_type_by_annotation(value)
     assert result == expected
@@ -87,7 +94,56 @@ def test_get_type_by_annotation_literal(value: type, expected: list[str]) -> Non
 def test_get_type_by_annotation_path() -> None:
     """Test getting type from Path annotation."""
     result = get_type_by_annotation(Path)
-    assert result == ["Path"]
+    assert result == [Path]
+
+
+# =============================================================================
+# Tests for type_repr
+# =============================================================================
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (str, "string"),
+        (int, "integer"),
+        (bool, "boolean"),
+        (float, "number"),
+        (list, "array"),
+        (dict, "object"),
+        (type(None), "null"),
+        (Path, "Path"),
+        # Literal values
+        ("a", '"a"'),
+        (1, "1"),
+        (True, "true"),
+        (False, "false"),
+        (1.5, "1.5"),
+    ],
+)
+def test_type_repr(value: Any, expected: str) -> None:
+    """Test type_repr converts type items to display strings."""
+    assert type_repr(value) == expected
+
+
+# =============================================================================
+# Tests for format_types
+# =============================================================================
+
+
+def test_format_types_simple() -> None:
+    """Test format_types on a list of type objects."""
+    assert format_types([str, int]) == ["string", "integer"]
+
+
+def test_format_types_with_none() -> None:
+    """Test format_types includes null for NoneType."""
+    assert format_types([str, type(None)]) == ["string", "null"]
+
+
+def test_format_types_literal_values() -> None:
+    """Test format_types formats raw Literal values."""
+    assert format_types(["a", 1]) == ['"a"', "1"]
 
 
 # =============================================================================
@@ -105,8 +161,8 @@ def test_field_info_from_simple_field() -> None:
     result = FieldInfoModel.from_settings_field("field", field_info)
 
     assert result.name == "field"
-    assert result.types == ["string"]
-    assert result.default == '"value"'
+    assert result.types == [str]
+    assert result.default == "value"
     assert result.is_required is False
 
 
@@ -120,7 +176,7 @@ def test_field_info_from_required_field() -> None:
     result = FieldInfoModel.from_settings_field("field", field_info)
 
     assert result.name == "field"
-    assert result.types == ["string"]
+    assert result.types == [str]
     assert result.default is None
     assert result.is_required is True
 
@@ -186,7 +242,7 @@ def test_field_info_with_examples() -> None:
     field_info = Settings.model_fields["field"]
     result = FieldInfoModel.from_settings_field("field", field_info)
 
-    assert result.examples == ['"example1"', '"example2"']
+    assert result.examples == ["example1", "example2"]
     assert result.has_examples() is True
 
 
@@ -200,7 +256,7 @@ def test_field_info_examples_same_as_default() -> None:
     result = FieldInfoModel.from_settings_field("field", field_info)
 
     # When no examples provided, default is used as example
-    assert result.examples == ['"value"']
+    assert result.examples == ["value"]
     assert result.has_examples() is False
 
 
@@ -261,7 +317,7 @@ def test_field_info_with_default_factory() -> None:
     field_info = Settings.model_fields["items"]
     result = FieldInfoModel.from_settings_field("items", field_info)
 
-    assert result.default == '["a","b"]'
+    assert result.default == ["a", "b"]
     assert result.is_required is False
 
 
