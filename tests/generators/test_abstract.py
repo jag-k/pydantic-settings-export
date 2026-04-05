@@ -151,3 +151,33 @@ def test_file_paths_absolute_kept_as_is(file_paths_gen: type[AbstractGenerator],
     abs_path = tmp_path / "abs_output.txt"
     gen = file_paths_gen(generator_config=file_paths_gen.config(paths=[abs_path]))
     assert gen.file_paths() == [abs_path]
+
+
+# run(): all settings info combined into each output file
+def test_run_writes_all_settings_into_file(
+    file_paths_gen: type[AbstractGenerator],
+    tmp_path: Path,
+) -> None:  # type: ignore[type-arg]
+    from pydantic_settings_export.models import SettingsInfoModel
+
+    class _ContentGen(file_paths_gen):  # type: ignore[valid-type,misc]
+        name = "_test_combined_content_gen"
+
+        def generate_single(self, settings_info, level: int = 1) -> str:  # type: ignore[override]
+            return settings_info.name
+
+    settings = PSESettings(root_dir=tmp_path)
+    gen = _ContentGen(
+        settings=settings,
+        generator_config=file_paths_gen.config(paths=[Path("all.txt")], per_settings=False),
+    )
+    si_a = SettingsInfoModel(name="Alpha", fields=[])
+    si_b = SettingsInfoModel(name="Beta", fields=[])
+
+    written = gen.run(si_a, si_b)
+
+    assert len(written) == 1
+    assert written[0] == tmp_path / "all.txt"
+    content = (tmp_path / "all.txt").read_text()
+    assert "Alpha" in content
+    assert "Beta" in content

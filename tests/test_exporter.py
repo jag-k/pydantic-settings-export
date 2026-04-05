@@ -273,3 +273,119 @@ def test_exporter_skips_unchanged_files(simple_settings: type[BaseSettings], tmp
     # The second run - should skip since content unchanged
     result2 = exporter.run_all(simple_settings)
     assert output_file not in result2  # File not in an updated list
+
+
+# =============================================================================
+# Per-generator settings / extend_settings tests
+# =============================================================================
+
+
+def test_generator_settings_override_ignores_defaults(tmp_path: Path) -> None:
+    """Generator 'settings' field replaces default_settings entirely."""
+
+    class DefaultSettings(BaseSettings):
+        x: str = "default_field"
+
+    class OverrideSettings(BaseSettings):
+        y: str = "override_field"
+
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    output_file = tmp_path / "output.txt"
+
+    generator = SimpleGenerator(
+        pse_settings,
+        generator_config=SimpleSettings(
+            paths=[output_file],
+            settings=["override_module:OverrideSettings"],
+        ),
+    )
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+
+    with patch(
+        "pydantic_settings_export.exporter.import_settings_from_string",
+        return_value=[OverrideSettings],
+    ):
+        result = exporter.run_all(DefaultSettings)
+
+    assert output_file in result
+    content = output_file.read_text()
+    assert "OverrideSettings" in content
+    assert "DefaultSettings" not in content
+
+
+def test_generator_extend_settings_appends_to_defaults(tmp_path: Path) -> None:
+    """Generator 'extend_settings' appends to default_settings."""
+
+    class DefaultSettings(BaseSettings):
+        x: str = "default_field"
+
+    class ExtraSettings(BaseSettings):
+        z: str = "extra_field"
+
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    output_file = tmp_path / "output.txt"
+
+    generator = SimpleGenerator(
+        pse_settings,
+        generator_config=SimpleSettings(
+            paths=[output_file],
+            extend_settings=["extra_module:ExtraSettings"],
+        ),
+    )
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+
+    with patch(
+        "pydantic_settings_export.exporter.import_settings_from_string",
+        return_value=[ExtraSettings],
+    ):
+        result = exporter.run_all(DefaultSettings)
+
+    assert output_file in result
+    content = output_file.read_text()
+    assert "DefaultSettings" in content
+    assert "ExtraSettings" in content
+
+
+def test_generator_no_override_uses_defaults(tmp_path: Path) -> None:
+    """Generator without settings/extend_settings uses default_settings as-is."""
+
+    class DefaultSettings(BaseSettings):
+        x: str = "default_field"
+
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    output_file = tmp_path / "output.txt"
+
+    generator = SimpleGenerator(
+        pse_settings,
+        generator_config=SimpleSettings(paths=[output_file]),
+    )
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+    result = exporter.run_all(DefaultSettings)
+
+    assert output_file in result
+    assert "DefaultSettings" in output_file.read_text()
+
+
+def test_exporter_caches_settings_info_across_generators(tmp_path: Path) -> None:
+    """The same settings object is parsed into SettingsInfoModel only once."""
+    from pydantic_settings_export.models import SettingsInfoModel
+
+    class SharedSettings(BaseSettings):
+        x: str = "shared"
+
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    file_a = tmp_path / "a.txt"
+    file_b = tmp_path / "b.txt"
+
+    gen_a = SimpleGenerator(pse_settings, generator_config=SimpleSettings(paths=[file_a]))
+    gen_b = SimpleGenerator(pse_settings, generator_config=SimpleSettings(paths=[file_b]))
+    exporter = Exporter(settings=pse_settings, generators=[gen_a, gen_b])
+
+    with patch.object(
+        SettingsInfoModel,
+        "from_settings_model",
+        wraps=SettingsInfoModel.from_settings_model,
+    ) as mock_parse:
+        exporter.run_all(SharedSettings)
+
+    mock_parse.assert_called_once()

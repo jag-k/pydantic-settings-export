@@ -74,9 +74,9 @@ class PSECLISettings(PSESettings):
     )
 
     @property
-    def settings(self) -> list[BaseSettings]:
-        """Get the settings."""
-        return [import_settings_from_string(i) for i in self.default_settings or []]
+    def settings(self) -> list[BaseSettings | type[BaseSettings]]:
+        """Get the settings from the default_settings list."""
+        return [obj for string in (self.default_settings or []) for obj in import_settings_from_string(string)]
 
     @model_validator(mode="before")
     @classmethod
@@ -368,6 +368,14 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     settings = s.settings
     if not settings:
         parser.exit(1, parser.format_help())
+
+    # Print loaded settings summary
+    def _settings_name(obj: BaseSettings | type[BaseSettings]) -> str:
+        cls = obj if isinstance(obj, type) else type(obj)
+        return f"{cls.__module__}:{cls.__name__}"
+
+    names = "\n".join(f"  - {_settings_name(obj)}" for obj in settings)
+    print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
 
     # Run main settings export
     exporter = Exporter(s, s.get_generators())

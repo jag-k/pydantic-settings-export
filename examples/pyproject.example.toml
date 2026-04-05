@@ -4,9 +4,11 @@
 [tool.pydantic_settings_export]
 # default_settings: array
 # The default settings to use. The settings are applied in the order they are
-# listed.
+# listed. Each entry can be either 'module:attribute' to import a specific class
+# or instance, or a plain module path (e.g. 'app.settings') to auto-discover all
+# BaseSettings subclasses defined in that module.
 # Default: []
-# Examples: ["settings:settings"], ["app.config.settings:Settings","app.config.settings.dev:Settings"]
+# Examples: ["settings:settings"], ["app.config.settings:Settings","app.config.settings.dev:Settings"], ["app.config.settings"]
 # default_settings = []
 
 # root_dir: Path
