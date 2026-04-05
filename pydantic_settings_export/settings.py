@@ -58,6 +58,20 @@ class PSESettings(TomlSettings):
         description="The project directory. Used for importing settings.",
     )
 
+    venv: str | None = Field(
+        "auto",
+        description=(
+            "Virtual environment to use when importing settings. "
+            "Possible values: "
+            "'auto' (auto-detect from ./venv, ./.venv, uv, or poetry), "
+            "'uv' (use uv-managed venv), "
+            "'poetry' (use Poetry-managed venv), "
+            "a path to the venv directory (relative paths are resolved from project_dir), "
+            "or null/empty string to disable."
+        ),
+        examples=["auto", "poetry", "uv", "./.venv", "/path/to/.venv"],
+    )
+
     relative_to: RelativeToSettings = Field(
         default_factory=RelativeToSettings,
         description="The relative directory settings.",
