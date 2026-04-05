@@ -381,6 +381,10 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     except Exception as e:
         parser.error(f"Failed to initialize settings: {e}")
 
+    # Override default_settings with CLI-provided settings (full replacement)
+    if args.settings:
+        s.default_settings = list(args.settings)
+
     # Process generators
     generators = _process_generators(args.generator)
     s.generators_list = generators

@@ -2,12 +2,14 @@
 
 import argparse
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from pydantic_settings_export.cli import (
     dir_type,
     file_type,
+    main,
     make_parser,
 )
 
@@ -291,3 +293,49 @@ def test_parser_full_command(tmp_path: Path) -> None:
     assert args.config_file == config_file.resolve().absolute()
     assert len(args.env_file) == 1
     assert args.settings == ["my_app.config:AppSettings"]
+
+
+# =============================================================================
+# main() integration tests (regression for issue #43)
+# =============================================================================
+
+
+def test_main_cli_settings_replaces_default_settings(tmp_path: Path) -> None:
+    """Positional settings args from CLI must replace default_settings (regression for #43).
+
+    Previously, args.settings was never wired to s.default_settings, so passing
+    settings via CLI was silently ignored and main() exited with code 1.
+    """
+    config_file = tmp_path / "pyproject.toml"
+    # No default_settings in config — proves that CLI args alone are enough
+    config_file.write_text("[tool.pydantic_settings_export]\n")
+
+    with (
+        patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")),
+        patch("pydantic_settings_export.cli.Exporter") as mock_exporter_cls,
+    ):
+        mock_exporter_cls.return_value.run_all.return_value = []
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "--config-file",
+                str(config_file),
+                "--venv",
+                "",
+                "pydantic_settings_export.settings:PSESettings",
+            ])
+
+    # 0 = settings found and processed; 1 = no settings found (the old bug)
+    assert exc_info.value.code == 0
+    mock_exporter_cls.return_value.run_all.assert_called_once()
+
+
+def test_main_exits_when_no_settings_provided(tmp_path: Path) -> None:
+    """When no settings are given via CLI or config, main() must exit with code 1."""
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("[tool.pydantic_settings_export]\n")
+
+    with patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")):
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--config-file", str(config_file), "--venv", ""])
+
+    assert exc_info.value.code == 1
