@@ -52,6 +52,8 @@ class SimpleGenerator(AbstractGenerator[SimpleSettings]):
             result += f"\n{indent}{docs}\n"
 
         for field in settings_info.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             field_name = f"`{field.full_name}`"
             if field.deprecated:
                 field_name += " (⚠️ Deprecated)"

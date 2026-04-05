@@ -194,7 +194,7 @@ disable_error_code = ["arg-type"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
-disable_error_code = ["arg-type"]
+disable_error_code = ["arg-type", "no-untyped-def"]
 
 [tool.coverage.report]
 exclude_lines = [

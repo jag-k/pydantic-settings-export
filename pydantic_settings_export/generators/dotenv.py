@@ -7,7 +7,7 @@ from pydantic import ConfigDict, Field, model_validator
 
 from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
 
-from .abstract import AbstractGenerator, BaseGeneratorSettings
+from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -32,7 +32,7 @@ DOTENV_MODE_MAP: dict[DotEnvMode, tuple[bool, bool]] = {
 DOTENV_MODE_MAP_DEFAULT = DOTENV_MODE_MAP["all"]
 
 
-class DotEnvSettings(BaseGeneratorSettings):
+class DotEnvSettings(BaseEnvGeneratorSettings):
     """Settings for the .env file."""
 
     model_config = ConfigDict(title="Generator: dotenv File Settings")
@@ -82,7 +82,7 @@ class DotEnvSettings(BaseGeneratorSettings):
         return self
 
 
-class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
+class DotEnvGenerator(AbstractEnvGenerator[DotEnvSettings]):
     """The .env example generator."""
 
     name = "dotenv"
@@ -103,10 +103,13 @@ class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
         :param is_required: Whether to include required fields
         :return: The string to add to the .env file or None if the field should be skipped.
         """
-        # Get the environment variable name, using alias if available
-        field_name = f"{settings_info.env_prefix}{field.name.upper()}"
-        if field.aliases:
-            field_name = field.aliases[0].upper()
+        # Apply case normalization: to_upper_case is ignored when case_sensitive=True
+        raw = field.env_names[0] if field.env_names else f"{settings_info.env_prefix}{field.name}"
+        field_name = self.apply_env_case(
+            raw,
+            to_upper_case=self.generator_config.to_upper_case,
+            case_sensitive=settings_info.case_sensitive,
+        )
 
         # Skip required fields if we're only including optional ones
         if field.is_required and not is_required:
@@ -166,7 +169,9 @@ class DotEnvGenerator(AbstractGenerator[DotEnvSettings]):
         if self.generator_config.split_by_group:
             result += "\n"
 
-        child_results = [self.generate_single(child) for child in settings_info.child_settings]
+        # Only recurse into env-accessible children; non-accessible ones are shown
+        # as JSON fields in the parent's fields list (already processed above).
+        child_results = [self.generate_single(child) for child in settings_info.child_settings if child.env_accessible]
         has_content = has_content or any(r.strip() for r in child_results)
         result += "".join(r for r in child_results if r.strip())
 

@@ -289,6 +289,8 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
         self._add_header_comments(container, child.name, child.docs)
 
         for field in child.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             if self._should_include_field(field):
                 self._add_field_to_container(container, field, prefix=dotted_prefix)
 
@@ -301,6 +303,8 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
     ) -> None:
         """Add settings (fields + child settings) to a container (doc or section)."""
         for field in settings.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             if self._should_include_field(field):
                 self._add_field_to_container(container, field)
 
