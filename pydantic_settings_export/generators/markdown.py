@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
-from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
+from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, format_types, value_repr
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
 from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings
@@ -180,12 +180,12 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
 
         default = "*required*"
         if not field.is_required:
-            default = q(field.default)
+            default = q(value_repr(field.default))
 
         example: str | None = None
         if field.examples:
-            example = ", ".join(q(example) for example in field.examples)
-        types = UNION_SEPARATOR.join(q(t) for t in field.types)
+            example = ", ".join(q(value_repr(ex)) for ex in field.examples)
+        types = UNION_SEPARATOR.join(q(t) for t in format_types(field.types))
 
         return TableRowDict(
             Name=name,

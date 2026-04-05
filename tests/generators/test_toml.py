@@ -159,15 +159,18 @@ def test_toml_generator_with_long_descriptions() -> None:
 
 
 def test_toml_generator_with_description_transformer() -> None:
-    """Test description formatter callback."""
+    """Test description formatter override via subclassing."""
 
-    def uppercase(desc: str) -> str:
-        return desc.upper()
+    class UpperCaseTomlGenerator(TomlGenerator):
+        name = "toml-uppercase"
+
+        def _format_description_comment(self, description: str) -> str:
+            return description.upper()
 
     class Settings(BaseSettings):
         field: str = Field(default="value", description="lowercase text")
 
-    generator = TomlGenerator(generator_config=TomlSettings(description_formatter=uppercase))
+    generator = UpperCaseTomlGenerator()
     result = generator.generate(SettingsInfoModel.from_settings_model(Settings))
 
     expected = """\
@@ -182,13 +185,13 @@ def test_toml_generator_with_description_transformer() -> None:
 
 
 def test_toml_generator_without_formatters(simple_settings: type[BaseSettings]) -> None:
-    """Test TOML generation without any formatters."""
+    """Test TOML generation with all comment sections disabled."""
     generator = TomlGenerator(
         generator_config=TomlSettings(
-            header_formatter=None,
-            type_formatter=None,
-            description_formatter=None,
-            default_formatter=None,
+            show_header=False,
+            show_types=False,
+            show_description=False,
+            show_default=False,
         )
     )
     result = generator.generate(SettingsInfoModel.from_settings_model(simple_settings))

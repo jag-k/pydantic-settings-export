@@ -34,6 +34,10 @@ else:
 __all__ = (
     "FieldInfoModel",
     "SettingsInfoModel",
+    "format_types",
+    "to_python_jsonable",
+    "type_repr",
+    "value_repr",
 )
 
 logger = logging.getLogger(__name__)
@@ -42,21 +46,58 @@ BASE_SETTINGS_DOCS = (getdoc(BaseSettings) or "").strip()
 BASE_MODEL_DOCS = (getdoc(BaseModel) or "").strip()
 
 
-def value_to_jsonable(value: Any, value_type: type | None = None) -> Any:
+def to_python_jsonable(value: Any, value_type: type | None = None) -> Any:
+    """Convert *value* to a JSON-serialisable Python object (not a string).
+
+    Pydantic serialisation (``dump_python(mode="json")``) is used so that
+    custom types such as ``SecretStr``, ``AnyUrl``, ``Path``, etc. are
+    reduced to their JSON-native equivalents before any further processing.
+
+    :param value: The value to convert.
+    :param value_type: Optional explicit type hint; falls back to ``type(value)``.
+    :return: A JSON-serialisable Python value (``str``, ``int``, ``float``,
+        ``bool``, ``None``, ``list``, or ``dict``).
+    """
     if value_type is None:
         value_type = type(value)
-
     try:
-        return TypeAdapter(value_type).dump_json(value, warnings="error").decode()
+        return TypeAdapter(value_type).dump_python(value, mode="json", warnings="error")
     except PydanticSerializationError:
         return str(value)
 
 
-def _prepare_example(example: Any, value_type: type | None = None) -> str:
+def value_to_jsonable(value: Any, value_type: type | None = None) -> str:
+    """Convert *value* to a JSON string.
+
+    Thin wrapper around :func:`to_python_jsonable` followed by
+    :func:`json.dumps`.  Kept for backward compatibility.
+
+    :param value: The value to convert.
+    :param value_type: Optional explicit type hint.
+    :return: JSON-encoded string (e.g. ``'"hello"'``, ``'42'``, ``'true'``).
+    """
+    return json.dumps(to_python_jsonable(value, value_type), separators=(",", ":"))
+
+
+def value_repr(v: Any) -> str:
+    """Render a raw JSON-serialisable value as a JSON string for display.
+
+    Used by generators to turn a value stored in
+    :attr:`FieldInfoModel.default`, :attr:`FieldInfoModel.value`, or an
+    element of :attr:`FieldInfoModel.examples` into a human-readable string.
+
+    :param v: A value as returned by :func:`to_python_jsonable`.
+    :return: Compact JSON string, e.g. ``'"hello"'``, ``'42'``, ``'true'``,
+        ``'null'``, ``'["a","b"]'``.
+    """
+    return json.dumps(v, separators=(",", ":"))
+
+
+def _prepare_example(example: Any, value_type: type | None = None) -> Any:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
-    return value_to_jsonable(example, value_type)
+    return to_python_jsonable(example, value_type)
 
 
 def _alias_path_to_str(value: AliasPath | str) -> str:
@@ -139,7 +180,7 @@ def _resolve_field_annotation(annotation: Any) -> Any:
 P = TypeVar("P", bound=Path)
 
 
-def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[str]:
+def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[Any]:
     args: list[Any] = list(get_args(annotation))
     if remove_none:
         args = [arg for arg in args if arg is not None]
@@ -158,18 +199,67 @@ def get_type_by_annotation(annotation: Any, remove_none: bool = True) -> list[st
         else:
             annotation = None
 
-    # If it is a Literal, get all types to return in "original" format like `1 | 'some-str'`
-    # instead of `Literal[1, 'some-str']` or `Literal`.
+    # If it is a Literal, return raw Python values (generators decide how to format).
     if origin is Literal:
-        return [json.dumps(a, default=repr) for a in args]
+        return list(args)
 
-    # If it is a ForwardRef, get the value or the argument to return something like `CustomType`
-    # instead of `"CustomType"`, `ForwardRef("CustomType")` or `ForwardRef`.
+    # If it is a ForwardRef, try to resolve it first (Pydantic sets __forward_value__
+    # after model_rebuild). Fall back to keeping the ForwardRef object as-is.
     if isinstance(annotation, ForwardRef):
-        return [annotation.__forward_value__ or annotation.__forward_arg__]
+        try:
+            resolved = annotation.__forward_value__
+            if resolved is not None:
+                return get_type_by_annotation(resolved)
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not resolve ForwardRef %r", annotation)
+        return [annotation]
 
-    # Map the annotation to the type in the FIELD_TYPE_MAP
-    return [FIELD_TYPE_MAP.get(annotation, annotation.__name__ if annotation else "any")]
+    # Normalize None / NoneType to type(None) for consistent handling.
+    if annotation is None or annotation is type(None):
+        return [type(None)]
+
+    # Return the type object itself; generators apply their own formatting.
+    return [annotation]
+
+
+def type_repr(t: Any) -> str:
+    """Convert a single type annotation item to a human-readable string.
+
+    Items in the ``FieldInfoModel.types`` list can be:
+
+    * A :class:`type` object (e.g. ``str``, ``int``, :class:`~pathlib.Path`)
+    * A raw Python value from a ``Literal`` annotation (e.g. ``"a"``, ``1``)
+    * A :class:`~typing.ForwardRef` for unresolved forward references
+
+    :param t: A single element as returned by :func:`get_type_by_annotation`.
+    :return: Human-readable string representation suitable for display.
+    """
+    if isinstance(t, type):
+        return FIELD_TYPE_MAP.get(t, t.__name__)
+    if isinstance(t, ForwardRef):
+        resolved = None
+        try:
+            resolved = t.__forward_value__
+        except Exception:  # noqa: BLE001
+            logger.debug("Could not get __forward_value__ from ForwardRef %r", t)
+        return type_repr(resolved) if resolved is not None else (t.__forward_arg__ or repr(t))
+    # bool must come before int because bool is a subclass of int
+    if isinstance(t, bool):
+        return json.dumps(t)
+    if isinstance(t, (int, float)):
+        return str(t)
+    if isinstance(t, (str, Path)):
+        return json.dumps(str(t))
+    return repr(t)
+
+
+def format_types(types: list[Any]) -> list[str]:
+    """Convert a list of type annotation items to display strings.
+
+    :param types: The ``types`` list from a :class:`FieldInfoModel` instance.
+    :return: List of human-readable strings, one per type item.
+    """
+    return [type_repr(t) for t in types]
 
 
 def default_path(default: P, global_settings: PSESettings | None = None) -> P:
@@ -201,11 +291,21 @@ class FieldInfoModel(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str = Field(..., description="The name of the field.")
-    types: list[str] = Field(..., description="The type of the field.")
-    default: str | None = Field(None, description="The default value of the field as a string.")
-    value: str | None = Field(None, description="The actual value from an instance (JSON serialized).")
+    types: list[Any] = Field(..., description="The type of the field.")
+    is_required: bool = Field(False, description="True when the field has no default value (required field).")
+    default: Any = Field(
+        None,
+        description="The default value of the field as a raw Python object. Only meaningful when is_required=False.",
+    )
+    has_value: bool = Field(
+        False, description="True when an instance value that differs from the default is available."
+    )
+    value: Any = Field(
+        None,
+        description="The actual value from an instance as a raw Python object. Only meaningful when has_value=True.",
+    )
     description: str | None = Field(None, description="The description of the field.")
-    examples: list[str] = Field(default_factory=list, description="The examples of the field.")
+    examples: list[Any] = Field(default_factory=list, description="The examples of the field as raw Python objects.")
     aliases: list[str] = Field(default_factory=list, description="The aliases of the field.")
     env_names: list[str] = Field(default_factory=list, description="Computed env variable names (primary first).")
     deprecated: bool = Field(False, description="Mark this field as an deprecated field.")
@@ -221,27 +321,18 @@ class FieldInfoModel(BaseModel):
         """Get the display name (first alias if present, otherwise field name)."""
         return self.aliases[0] if self.aliases else self.name
 
-    @property
-    def is_required(self) -> bool:
-        """Check if the field is required."""
-        return self.default is None
-
-    @property
-    def has_value(self) -> bool:
-        """Check if the field has an actual value different from the default."""
-        return self.value is not None and self.value != self.default
-
     def has_examples(self) -> bool:
         """Check if the field has examples."""
         return bool(self.examples and self.examples != [self.default])
 
     @staticmethod
-    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> str | None:
+    def create_default(field: FieldInfo, global_settings: PSESettings | None = None) -> Any:
         """Make the default value for the field.
 
         :param field: The field info to generate the default value for.
         :param global_settings: The global settings.
-        :return: The default value for the field as a string, or None if there is no default value.
+        :return: Raw JSON-serialisable Python value, or :data:`~pydantic_core.PydanticUndefined`
+            when the field has no default (i.e. it is required).
         """
         default: object | PydanticUndefined = field.default  # type: ignore[valid-type]
 
@@ -250,10 +341,10 @@ class FieldInfoModel(BaseModel):
                 default = field.default_factory()
             except Exception:
                 logger.warning("Failed to compute default value for field %s", field)
-                return None
+                return PydanticUndefined
 
         if default is PydanticUndefined:
-            return None
+            return PydanticUndefined
 
         if isinstance(default, set):
             default = sorted(default)
@@ -262,25 +353,26 @@ class FieldInfoModel(BaseModel):
         if isinstance(default, Path):
             default = default_path(default, global_settings)
 
-        return value_to_jsonable(default)
+        return to_python_jsonable(default)
 
     @staticmethod
     def create_value(
         instance: BaseSettings,
         field_name: str,
         global_settings: PSESettings | None = None,
-    ) -> str | None:
+    ) -> Any:
         """Extract the actual value from an instance.
 
         :param instance: The settings instance to extract the value from.
         :param field_name: The name of the field.
         :param global_settings: The global settings.
-        :return: The actual value as a JSON string, or None if not available.
+        :return: Raw JSON-serialisable Python value, or :data:`~pydantic_core.PydanticUndefined`
+            when the value is unavailable.
         """
         value = getattr(instance, field_name, PydanticUndefined)
 
         if value is PydanticUndefined:
-            return None
+            return PydanticUndefined
 
         if isinstance(value, set):
             value = sorted(value)
@@ -288,7 +380,7 @@ class FieldInfoModel(BaseModel):
         if isinstance(value, Path):
             value = default_path(value, global_settings)
 
-        return value_to_jsonable(value)
+        return to_python_jsonable(value)
 
     @classmethod
     def from_settings_field(
@@ -323,14 +415,18 @@ class FieldInfoModel(BaseModel):
         # Get the name from the alias if it exists
         name: str = name
         # Get the type from the FIELD_TYPE_MAP if it exists
-        types: list[str] = get_type_by_annotation(annotation)
-        default = cls.create_default(field, global_settings)
-        value = cls.create_value(instance, name, global_settings) if instance else None
+        types: list[Any] = get_type_by_annotation(annotation)
+        raw_default = cls.create_default(field, global_settings)
+        is_required = raw_default is PydanticUndefined
+        default: Any = None if is_required else raw_default
+        raw_value = cls.create_value(instance, name, global_settings) if instance else PydanticUndefined
+        _has_value = raw_value is not PydanticUndefined and raw_value != default
+        value: Any = None if raw_value is PydanticUndefined else raw_value
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
-        examples: list[str] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
-        if not examples and default:
+        examples: list[Any] = [_prepare_example(example, field.annotation) for example in (field.examples or [])]
+        if not examples and not is_required:
             examples = [default]
         # Get the deprecated status from the field if it exists
         deprecated: bool = bool(field.deprecated or False)
@@ -355,7 +451,9 @@ class FieldInfoModel(BaseModel):
         return cls(
             name=name,
             types=types,
+            is_required=is_required,
             default=default,
+            has_value=_has_value,
             value=value,
             description=description,
             examples=examples,
