@@ -81,9 +81,7 @@ repos:
         name: pydantic-settings-export
         entry: uv
         args: [run, pydantic-settings-export]
-        language: python
+        language: unsupported
         files: \.py$
         pass_filenames: false
         verbose: true
-        additional_dependencies:
-          - ".[email,regions,toml]"
