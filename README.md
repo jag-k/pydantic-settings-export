@@ -140,6 +140,11 @@ pydantic-settings-export your_app.settings:Settings
 # Multiple generators
 pydantic-settings-export --generator markdown --generator dotenv -- your_app.settings:Settings
 
+# Override venv detection from CLI (useful for one-off runs without pyproject.toml)
+pydantic-settings-export --venv uv your_app.settings:Settings
+pydantic-settings-export --venv .venv your_app.settings:Settings
+pydantic-settings-export --venv "" your_app.settings:Settings  # disable
+
 # Help with all options and sub-commands
 pydantic-settings-export --help
 ```
@@ -174,6 +179,23 @@ repos:
 ```
 
 NOTE: You can use `pre-commit autoupdate` to update the hook to the latest version.
+
+#### Importing settings that depend on project packages
+
+When running as a pre-commit hook the tool executes in its own isolated environment, so your
+project's installed packages are not on `sys.path` by default. Use the `venv` option to make
+the hook discover and load your project's virtual environment automatically:
+
+```toml
+# pyproject.toml
+[tool.pydantic_settings_export]
+venv = "auto"  # auto-detect: ./venv, ./.venv, uv, poetry
+# venv = "uv"       # force uv
+# venv = "poetry"  # force poetry
+# venv = ".venv"   # explicit path (relative to project_dir)
+```
+
+Detection order for `"auto"`: `./venv` → `./.venv` → uv → Poetry.
 
 ### CI/CD Integration
 
@@ -258,6 +280,8 @@ project_dir = "."
 # Import a specific class or an entire module (auto-discovers all BaseSettings subclasses)
 default_settings = ["my_app.settings:AppSettings"]
 env_file = ".env"
+# Virtual environment for importing settings (useful in pre-commit hooks)
+venv = "auto"  # auto | uv | poetry | <path> | null to disable
 
 # Generate Markdown docs
 [[tool.pydantic_settings_export.generators.markdown]]

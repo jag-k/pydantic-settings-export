@@ -17,6 +17,7 @@ from pydantic_settings_export.generators.simple import SimpleGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
 from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
+from pydantic_settings_export.venv import setup_venv_sys_path
 from pydantic_settings_export.version import __version__
 
 if sys.version_info < (3, 11):
@@ -269,6 +270,17 @@ def make_parser() -> argparse.ArgumentParser:
         help="Use the .env file to load environment variables. Can be used multiple times. (default: [])",
     )
     config_group.add_argument(
+        "--venv",
+        default=None,
+        metavar="VENV",
+        help=(
+            "Virtual environment to use when importing settings. "
+            "Values: 'auto' (./venv, ./.venv, uv, poetry), "
+            "'uv', 'poetry', a path to the venv dir, or '' to disable. "
+            "(default: value from pyproject.toml or 'auto')"
+        ),
+    )
+    config_group.add_argument(
         "--generator",
         "-g",
         nargs="*",
@@ -315,11 +327,13 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
 def _setup_settings(
     config_file: Path | None = None,
     project_dir: Path | None = None,
+    venv: str | None = None,
 ) -> PSECLISettings:
     """Initialize and configure PSECLISettings.
 
     :param config_file: Path to the configuration file
     :param project_dir: Path to the project directory
+    :param venv: Override the venv setting from CLI (None means use pyproject.toml value)
     :return: Configured PSECLISettings instance
     """
     if config_file:
@@ -328,6 +342,9 @@ def _setup_settings(
 
     if project_dir:
         s.project_dir = project_dir.resolve().absolute()
+    if venv is not None:
+        s.venv = venv or None
+    setup_venv_sys_path(s.venv, s.project_dir)
     sys.path.insert(0, str(s.project_dir))
     return s
 
@@ -355,7 +372,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     _load_env_files(args.env_file)
 
     # Setup settings
-    s = _setup_settings(args.config_file, args.project_dir)
+    s = _setup_settings(args.config_file, args.project_dir, args.venv)
 
     # Process generators
     generators = _process_generators(args.generator)

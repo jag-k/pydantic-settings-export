@@ -21,6 +21,15 @@
 # Default: "<project_dir>"
 # project_dir = "<project_dir>"
 
+# venv: string | null
+# Virtual environment to use when importing settings. Possible values: 'auto'
+# (auto-detect from ./venv, ./.venv, uv, or poetry), 'uv' (use uv-managed venv),
+# 'poetry' (use Poetry-managed venv), a path to the venv directory (relative paths
+# are resolved from project_dir), or null/empty string to disable.
+# Default: "auto"
+# Examples: "auto", "poetry", "uv", "./.venv", "/path/to/.venv"
+# venv = "auto"
+
 # respect_exclude: boolean
 # Respect the exclude attribute in the fields.
 # Default: true
