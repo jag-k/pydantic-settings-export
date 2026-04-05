@@ -161,7 +161,7 @@ def test_field_info_with_validation_alias_path() -> None:
     field_info = Settings.model_fields["field"]
     result = FieldInfoModel.from_settings_field("field", field_info)
 
-    assert result.aliases == ["nested.field"]
+    assert result.aliases == ["nested"]  # BUG-6 fixed: AliasPath uses path[0]
 
 
 def test_field_info_with_validation_alias_choices() -> None:
@@ -334,6 +334,7 @@ def test_settings_info_with_nested_settings() -> None:
     class Settings(BaseSettings):
         """Main settings."""
 
+        model_config = SettingsConfigDict(env_nested_delimiter="__")
         database: Database = Field(default_factory=Database)
 
     result = SettingsInfoModel.from_settings_model(Settings)
@@ -359,7 +360,7 @@ def test_settings_info_with_nested_delimiter() -> None:
     result = SettingsInfoModel.from_settings_model(Settings)
 
     # Child settings should have prefix with nested delimiter
-    assert result.child_settings[0].env_prefix == "APP_DATABASE__"
+    assert result.child_settings[0].env_prefix == "APP_database__"
 
 
 def test_settings_info_without_docs() -> None:
@@ -381,6 +382,7 @@ def test_settings_info_with_optional_nested_settings() -> None:
         host: str = Field(default="localhost")
 
     class Settings(BaseSettings):
+        model_config = SettingsConfigDict(env_nested_delimiter="__")
         database: Database | None = Field(default=None)
 
     result = SettingsInfoModel.from_settings_model(Settings)
@@ -419,6 +421,7 @@ def test_settings_info_deeply_nested() -> None:
         level2: Level2 = Field(default_factory=Level2)
 
     class Settings(BaseSettings):
+        model_config = SettingsConfigDict(env_nested_delimiter="__")
         level1: Level1 = Field(default_factory=Level1)
 
     result = SettingsInfoModel.from_settings_model(Settings)
@@ -438,13 +441,13 @@ def test_settings_info_env_prefix_propagation() -> None:
         host: str = Field(default="localhost")
 
     class Settings(BaseSettings):
-        model_config = SettingsConfigDict(env_prefix="APP_")
+        model_config = SettingsConfigDict(env_prefix="APP_", env_nested_delimiter="_")
         database: Database = Field(default_factory=Database)
 
     result = SettingsInfoModel.from_settings_model(Settings)
 
     assert result.env_prefix == "APP_"
-    assert result.child_settings[0].env_prefix == "APP_DATABASE_"
+    assert result.child_settings[0].env_prefix == "APP_database_"
 
 
 def test_settings_info_from_instance() -> None:

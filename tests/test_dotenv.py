@@ -1,7 +1,7 @@
 """Tests for DotEnvGenerator."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pydantic_settings_export import SettingsInfoModel
 from pydantic_settings_export.generators.dotenv import DotEnvGenerator
@@ -57,6 +57,7 @@ def test_dotenv_nested_instance() -> None:
         port: int = Field(default=5432, description="DB port")
 
     class AppSettings(BaseSettings):
+        model_config = SettingsConfigDict(env_nested_delimiter="_")
         debug: bool = Field(default=False, description="Debug mode")
         database: Database = Field(default_factory=Database)
 

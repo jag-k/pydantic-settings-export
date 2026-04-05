@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar, cast, final
@@ -13,7 +14,12 @@ else:
     SettingsInfoModel: TypeAlias = BaseModel
 
 
-__all__ = ("AbstractGenerator",)
+__all__ = (
+    "AbstractEnvGenerator",
+    "AbstractGenerator",
+    "BaseEnvGeneratorSettings",
+    "BaseGeneratorSettings",
+)
 
 
 class BaseGeneratorSettings(BaseModel):
@@ -35,7 +41,24 @@ class BaseGeneratorSettings(BaseModel):
         return self.enabled and bool(self.paths)
 
 
+class BaseEnvGeneratorSettings(BaseGeneratorSettings):
+    """Base settings for env-variable-centric generators (dotenv, markdown).
+
+    Structural generators (TOML, simple, JSON, YAML) do *not* inherit from this class.
+    """
+
+    to_upper_case: bool = Field(
+        True,
+        description=(
+            "Convert env variable names to upper case in the output. "
+            "Has no effect when the settings model has ``case_sensitive=True`` — "
+            "names are always kept as-is in that case to avoid misleading output."
+        ),
+    )
+
+
 C = TypeVar("C", bound=BaseGeneratorSettings)
+CE = TypeVar("CE", bound=BaseEnvGeneratorSettings)
 
 
 class AbstractGenerator(ABC, Generic[C]):
@@ -54,17 +77,41 @@ class AbstractGenerator(ABC, Generic[C]):
         self.settings = settings or PSESettings()
         self.generator_config: C = generator_config if generator_config is not None else cast(C, self.config())
 
+    @classmethod
+    def _extra_subclass_checks(cls, **kwargs: Any) -> None:
+        """Extra checks, when subclass is created."""
+        return None
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
         """Initialize the subclass."""
+        check_name = kwargs.pop("check_name", False)
         super().__init_subclass__(**kwargs)
-        if not getattr(cls, "name", None):
+        if "name" not in cls.__dict__:
+            if check_name:
+                raise ValueError("Generator must have a name")
+            # Allow explicitly abstract helpers to opt out of registration.
+            # Use an explicit ``__abstract__ = True`` attribute or rely on
+            # Python's ABC machinery (inspect.isabstract) to detect classes
+            # that still carry unimplemented abstract methods.  Any other
+            # subclass that simply forgot to declare ``name`` is a
+            # misconfigured concrete generator and should fail fast.
+            if getattr(cls, "__abstract__", False) or inspect.isabstract(cls):
+                return
             raise ValueError("Generator must have a name")
-        if not getattr(cls, "config", None) or not isinstance(cls.config, type):
-            raise ValueError("Generator must have a config")
-        if cls.name in AbstractGenerator.ALL_GENERATORS:
-            raise ValueError(f"Generator {cls.name} already exists")
-        cls.config.__doc__ = cls.config.__doc__ or ""
-        cls.config.__doc__ += f"\n\nGenerator name: `{cls.name}`."
+        conf = getattr(cls, "config", None)
+        if not conf or not isinstance(conf, type):
+            raise ValueError(f"Generator {cls.name!r} must have a config")
+        if not issubclass(conf, BaseGeneratorSettings):
+            raise ValueError(
+                f"Generator {cls.name!r} have config, which is not inherited from {BaseGeneratorSettings.__name__}"
+            )
+        if any(g.name == cls.name for g in AbstractGenerator.ALL_GENERATORS):
+            raise ValueError(f"Generator {cls.name!r} already exists")
+
+        cls._extra_subclass_checks(**kwargs)
+
+        conf.__doc__ = conf.__doc__ or ""
+        conf.__doc__ += f"\n\nGenerator name: `{cls.name}`."
 
         AbstractGenerator.ALL_GENERATORS.append(cls)
 
@@ -166,3 +213,39 @@ class AbstractGenerator(ABC, Generic[C]):
             __base__=BaseModel,
             __doc__="The configuration of generators.",
         )
+
+
+class AbstractEnvGenerator(AbstractGenerator[CE]):
+    """Base class for env-variable-centric generators (dotenv, markdown).
+
+    Structural generators (TOML, simple, JSON, YAML) do *not* inherit from this class.
+
+    Provides :meth:`apply_env_case` for consistent case normalization across all
+    env generators.
+    """
+
+    @staticmethod
+    def apply_env_case(name: str, *, to_upper_case: bool, case_sensitive: bool) -> str:
+        """Apply case normalization to an env variable name.
+
+        When the settings model declares ``case_sensitive=True``, *name* is returned
+        unchanged regardless of *to_upper_case* — uppercasing a case-sensitive var name
+        would produce incorrect documentation.
+
+        :param name: Raw env variable name (as stored in ``FieldInfoModel.env_names``).
+        :param to_upper_case: Generator preference (from generator config).
+        :param case_sensitive: From ``SettingsInfoModel.case_sensitive``.
+        :return: Case-normalized env variable name.
+        """
+        if case_sensitive:
+            return name
+        return name.upper() if to_upper_case else name
+
+    @classmethod
+    def _extra_subclass_checks(cls, **kwargs: Any) -> None:
+        super()._extra_subclass_checks(**kwargs)
+        if not issubclass(cls.config, BaseEnvGeneratorSettings):
+            raise ValueError(
+                f"EnvGenerator {cls.name!r} have config, "
+                f"which is not inherited from {BaseEnvGeneratorSettings.__name__}"
+            )

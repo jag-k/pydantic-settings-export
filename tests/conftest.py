@@ -43,6 +43,8 @@ def nested_settings() -> type[BaseSettings]:
     class Settings(BaseSettings):
         """Main settings."""
 
+        model_config = SettingsConfigDict(env_nested_delimiter="_")
+
         database: Database = Field(default_factory=Database)
 
     return Settings
