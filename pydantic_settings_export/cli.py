@@ -74,9 +74,9 @@ class PSECLISettings(PSESettings):
     )
 
     @property
-    def settings(self) -> list[BaseSettings]:
-        """Get the settings."""
-        return [import_settings_from_string(i) for i in self.default_settings or []]
+    def settings(self) -> list[BaseSettings | type[BaseSettings]]:
+        """Get the settings from the default_settings list."""
+        return [obj for string in (self.default_settings or []) for obj in import_settings_from_string(string)]
 
     @model_validator(mode="before")
     @classmethod

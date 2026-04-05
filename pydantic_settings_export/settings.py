@@ -32,10 +32,16 @@ class PSESettings(TomlSettings):
 
     default_settings: list[str] = Field(
         default_factory=list,
-        description="The default settings to use. The settings are applied in the order they are listed.",
+        description=(
+            "The default settings to use. The settings are applied in the order they are listed. "
+            "Each entry can be either 'module:attribute' to import a specific class or instance, "
+            "or a plain module path (e.g. 'app.settings') to auto-discover all BaseSettings "
+            "subclasses defined in that module."
+        ),
         examples=[
             ["settings:settings"],
             ["app.config.settings:Settings", "app.config.settings.dev:Settings"],
+            ["app.config.settings"],
         ],
     )
 
