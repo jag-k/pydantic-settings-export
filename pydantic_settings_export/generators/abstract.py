@@ -98,7 +98,7 @@ class AbstractGenerator(ABC, Generic[C]):
             raise ValueError(
                 f"Generator {cls.name!r} have config, which is not inherited from {BaseGeneratorSettings.__name__}"
             )
-        if cls.name in AbstractGenerator.ALL_GENERATORS:
+        if any(g.name == cls.name for g in AbstractGenerator.ALL_GENERATORS):
             raise ValueError(f"Generator {cls.name!r} already exists")
 
         cls._extra_subclass_checks(**kwargs)
