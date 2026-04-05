@@ -37,6 +37,11 @@ from pydantic_settings_export.models import SettingsInfoModel
 # =============================================================================
 
 
+# NOTE: This helper relies on the private method EnvSettingsSource._extract_field_info
+# which is not part of the public pydantic-settings API and may be renamed, moved,
+# or removed in future releases.  If this function raises AttributeError after a
+# pydantic-settings upgrade, update the call below to use whatever replacement the
+# new version provides.
 def get_pydantic_settings_env_names(
     settings_cls: type[BaseSettings],
 ) -> dict[str, list[str]]:
@@ -47,7 +52,15 @@ def get_pydantic_settings_env_names(
     source = EnvSettingsSource(settings_cls)
     result = {}
     for field_name, field in settings_cls.model_fields.items():
-        infos = source._extract_field_info(field, field_name)
+        try:
+            infos = source._extract_field_info(field, field_name)
+        except AttributeError as exc:
+            raise AttributeError(
+                "EnvSettingsSource._extract_field_info is no longer available — "
+                "the pydantic-settings private API has changed. "
+                "Update get_pydantic_settings_env_names() in this test file to use "
+                "the new API exposed by EnvSettingsSource."
+            ) from exc
         result[field_name] = [env_name for _, env_name, _ in infos]
     return result
 

@@ -1,3 +1,4 @@
+import inspect
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar, cast, final
@@ -14,10 +15,10 @@ else:
 
 
 __all__ = (
-    "AbstractGenerator",
     "AbstractEnvGenerator",
-    "BaseGeneratorSettings",
+    "AbstractGenerator",
     "BaseEnvGeneratorSettings",
+    "BaseGeneratorSettings",
 )
 
 
@@ -85,12 +86,18 @@ class AbstractGenerator(ABC, Generic[C]):
         """Initialize the subclass."""
         check_name = kwargs.pop("check_name", False)
         super().__init_subclass__(**kwargs)
-        # Skip registration for intermediate abstract generator classes
-        # (those that do not define their own ``name`` class variable).
         if "name" not in cls.__dict__:
             if check_name:
                 raise ValueError("Generator must have a name")
-            return
+            # Allow explicitly abstract helpers to opt out of registration.
+            # Use an explicit ``__abstract__ = True`` attribute or rely on
+            # Python's ABC machinery (inspect.isabstract) to detect classes
+            # that still carry unimplemented abstract methods.  Any other
+            # subclass that simply forgot to declare ``name`` is a
+            # misconfigured concrete generator and should fail fast.
+            if getattr(cls, "__abstract__", False) or inspect.isabstract(cls):
+                return
+            raise ValueError("Generator must have a name")
         conf = getattr(cls, "config", None)
         if not conf or not isinstance(conf, type):
             raise ValueError(f"Generator {cls.name!r} must have a config")
@@ -208,7 +215,7 @@ class AbstractGenerator(ABC, Generic[C]):
         )
 
 
-class AbstractEnvGenerator(AbstractGenerator[CE], check_name=False):
+class AbstractEnvGenerator(AbstractGenerator[CE]):
     """Base class for env-variable-centric generators (dotenv, markdown).
 
     Structural generators (TOML, simple, JSON, YAML) do *not* inherit from this class.

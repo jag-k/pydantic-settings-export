@@ -125,6 +125,27 @@ def test_env_generator_non_env_config_raises():
                 return ""
 
 
+# ── AbstractEnvGenerator.apply_env_case ──────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("to_upper_case", "case_sensitive", "expected"),
+    [
+        (True, False, "MYKEY"),
+        (False, False, "MyKey"),
+        (True, True, "MyKey"),
+        (False, True, "MyKey"),
+    ],
+)
+def test_apply_env_case_contract(to_upper_case: bool, case_sensitive: bool, expected: str) -> None:
+    result = AbstractEnvGenerator.apply_env_case(
+        "MyKey",
+        to_upper_case=to_upper_case,
+        case_sensitive=case_sensitive,
+    )
+    assert result == expected
+
+
 # ── file_paths ────────────────────────────────────────────────────────────────
 
 
