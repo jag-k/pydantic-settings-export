@@ -16,7 +16,7 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pydantic-settings-export)][pypi]
 [![PyPI - License](https://img.shields.io/pypi/l/pydantic-settings-export)][license]
 
-*Export your Pydantic settings to documentation with ease!*
+_Export your Pydantic settings to documentation with ease!_
 
 This package seamlessly integrates with [pydantic] and [pydantic-settings] to automatically generate documentation from your settings models.
 Create Markdown docs, `.env.example` files, and more with minimal configuration.
@@ -78,10 +78,13 @@ pip install "pydantic-settings-export[toml]"  # Install with toml extra
 ## 🚀 Quick Start
 
 1. Install the package:
+
     ```bash
     pip install pydantic-settings-export
     ```
+
 2. Create your settings model:
+
     ```python
     from pydantic_settings import BaseSettings
 
@@ -91,9 +94,15 @@ pip install "pydantic-settings-export[toml]"  # Install with toml extra
         debug: bool = False
         api_key: str
     ```
+
 3. Generate documentation:
+
     ```bash
+    # Import a specific class
     pydantic-settings-export app.settings:AppSettings
+
+    # Import an entire module (auto-discovers all BaseSettings subclasses)
+    pydantic-settings-export app.settings
     ```
 
 For more detailed usage, see our [Getting Started Guide][gh-wiki/getting-started].
@@ -211,7 +220,8 @@ exporter = Exporter()
 exporter.run_all(MySettings)
 ```
 
-This will generate documentation using all available generators. For custom configuration, see our [Wiki][gh-wiki].
+This will generate documentation using all available generators.
+For custom configuration, see our [Wiki][gh-wiki].
 
 ### Exporting Instances with actual values
 
@@ -233,6 +243,7 @@ exporter.run_all(settings)
 ```
 
 When exporting an instance:
+
 - Default values are shown as comments
 - Actual instance values are shown as active configuration
 - If a value equals its default, no duplication occurs
@@ -244,6 +255,7 @@ Basic configuration in `pyproject.toml`:
 ```toml
 [tool.pydantic_settings_export]
 project_dir = "."
+# Import a specific class or an entire module (auto-discovers all BaseSettings subclasses)
 default_settings = ["my_app.settings:AppSettings"]
 env_file = ".env"
 
@@ -260,6 +272,36 @@ paths = [".env.example"]
 paths = ["config.example.toml"]
 comment_defaults = true  # Comment out fields with default values
 ```
+
+### Per-Generator Settings
+
+Each `[[tool.pydantic_settings_export.generators.*]]` block can define its own set of settings
+instead of (or in addition to) the global `default_settings`:
+
+```toml
+[tool.pydantic_settings_export]
+# Applied to all generators by default
+default_settings = ["my_app.settings:AppSettings"]
+
+# This generator uses only the global default_settings
+[[tool.pydantic_settings_export.generators.markdown]]
+paths = ["docs/AppSettings.md"]
+
+# This generator overrides default_settings entirely
+[[tool.pydantic_settings_export.generators.markdown]]
+paths = ["docs/KafkaProducer.md"]
+settings = ["my_app.kafka:KafkaProducerSettings"]
+
+# This generator extends default_settings with an extra class
+[[tool.pydantic_settings_export.generators.dotenv]]
+paths = [".env.example"]
+extend_settings = ["my_app.kafka:KafkaConsumerSettings"]
+```
+
+| Field             | Description                                                                             |
+| ----------------- | --------------------------------------------------------------------------------------- |
+| `settings`        | **Overrides** `default_settings` for this block — only the listed classes are exported. |
+| `extend_settings` | **Appends** to `default_settings` for this block. Ignored when `settings` is set.       |
 
 For advanced configuration options, see our [Configuration Guide][gh-wiki/config].
 
@@ -281,7 +323,7 @@ See real-world examples of different output formats:
 ### Configuration Files
 
 - [config.example.toml](examples/config.example.toml) - TOML configuration file with comments and type information
-  > Note: You can use `prefix` to generate TOML for any custom format, like pyproject.toml.
+    > Note: You can use `prefix` to generate TOML for any custom format, like pyproject.toml.
 
 ## 📚 Learn More
 
@@ -364,35 +406,19 @@ For complete guidelines, see our:
 
 [MIT][license]
 
-
 [pypi]: https://pypi.org/project/pydantic-settings-export/
-
 [license]: https://github.com/jag-k/pydantic-settings-export/blob/main/LICENSE
-
 [gh-wiki]: https://github.com/jag-k/pydantic-settings-export/wiki
-
 [gh-wiki/cli]: https://github.com/jag-k/pydantic-settings-export/wiki/CLI
-
 [gh-wiki/config]: https://github.com/jag-k/pydantic-settings-export/wiki/Configuration
-
 [gh-wiki/getting-started]: https://github.com/jag-k/pydantic-settings-export/wiki/Getting-Started
-
 [gh-wiki/parsers]: https://github.com/jag-k/pydantic-settings-export/wiki/Parsers
-
 [gh-wiki/generators]: https://github.com/jag-k/pydantic-settings-export/wiki/Generators
-
 [gh-issues]: https://github.com/jag-k/pydantic-settings-export/issues
-
 [gh-discussions]: https://github.com/jag-k/pydantic-settings-export/discussions
-
 [pydantic]: https://github.com/pydantic/pydantic
-
 [pydantic-settings]: https://github.com/pydantic/pydantic-settings
-
 [pre-commit]: https://github.com/pre-commit/pre-commit
-
 [uv]: https://github.com/astral-sh/uv
-
 [ruff]: https://github.com/astral-sh/ruff
-
 [hatch]: https://github.com/pypa/hatch
