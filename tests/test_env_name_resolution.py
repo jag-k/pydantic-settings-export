@@ -1676,14 +1676,14 @@ class TestAliasDuplication:
             verification_email: str = Field(
                 default="test@example.com",
                 description="Email to verify",
-                alias="GMAIL_USER_VERIVICATION_EMAIL",
+                alias="GMAIL_USER_VERIFICATION_EMAIL",
             )
 
         return Settings
 
     def test_env_names_match(self, settings_cls):
         actual = get_pydantic_settings_env_names(settings_cls)
-        assert actual == {"verification_email": ["gmail_user_verivication_email"]}
+        assert actual == {"verification_email": ["gmail_user_verification_email"]}
 
     def test_no_duplicate_aliases(self, settings_cls):
         """BUG-7: alias= produces duplicate alias entries ['X', 'X'].
@@ -1693,23 +1693,23 @@ class TestAliasDuplication:
         """
         info = SettingsInfoModel.from_settings_model(settings_cls)
         field = info.fields[0]
-        assert "GMAIL_USER_VERIVICATION_EMAIL" in field.aliases
-        if field.aliases.count("GMAIL_USER_VERIVICATION_EMAIL") > 1:
+        assert "GMAIL_USER_VERIFICATION_EMAIL" in field.aliases
+        if field.aliases.count("GMAIL_USER_VERIFICATION_EMAIL") > 1:
             pytest.xfail(
                 "BUG-7: alias='X' produces duplicate aliases ['X', 'X'] because "
                 "pydantic v2 auto-sets validation_alias=alias, and PSE appends both."
             )
-        assert field.aliases == ["GMAIL_USER_VERIVICATION_EMAIL"]
+        assert field.aliases == ["GMAIL_USER_VERIFICATION_EMAIL"]
 
     def test_dotenv_no_duplicate(self, settings_cls):
         """Dotenv output should use the alias once, not duplicate."""
         result = get_dotenv_output(settings_cls)
-        assert '# GMAIL_USER_VERIVICATION_EMAIL="test@example.com"' in result
+        assert '# GMAIL_USER_VERIFICATION_EMAIL="test@example.com"' in result
 
     def test_env_var_actually_works(self, settings_cls):
-        os.environ["GMAIL_USER_VERIVICATION_EMAIL"] = "alias_val"
+        os.environ["GMAIL_USER_VERIFICATION_EMAIL"] = "alias_val"
         try:
             s = settings_cls()
             assert s.verification_email == "alias_val"
         finally:
-            del os.environ["GMAIL_USER_VERIVICATION_EMAIL"]
+            del os.environ["GMAIL_USER_VERIFICATION_EMAIL"]

@@ -12,18 +12,14 @@ from pydantic_settings_export.generators.abstract import (
 )
 from pydantic_settings_export.settings import PSESettings
 
-# ── fixtures ──────────────────────────────────────────────────────────────────
 
-
+# fixtures
 @pytest.fixture(autouse=True)
 def _restore_all_generators():
     """Restore ALL_GENERATORS to its original state after each test."""
     snapshot = AbstractGenerator.ALL_GENERATORS.copy()
     yield
     AbstractGenerator.ALL_GENERATORS[:] = snapshot
-
-
-# ── fixtures ──────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
@@ -47,9 +43,7 @@ def file_paths_gen() -> type[AbstractGenerator]:  # type: ignore[type-arg]
     return FPGenerator
 
 
-# ── __init_subclass__: check_name kwarg ──────────────────────────────────────
-
-
+# __init_subclass__: check_name kwarg
 def test_check_name_kwarg_raises_without_name():
     with pytest.raises(ValueError, match="must have a name"):
 
@@ -57,9 +51,7 @@ def test_check_name_kwarg_raises_without_name():
             pass
 
 
-# ── __init_subclass__: config validation ─────────────────────────────────────
-
-
+# __init_subclass__: config validation
 def test_missing_config_raises():
     with pytest.raises(ValueError, match="must have a config"):
 
@@ -84,9 +76,7 @@ def test_config_wrong_base_raises():
                 return ""
 
 
-# ── __init_subclass__: duplicate name ────────────────────────────────────────
-
-
+# __init_subclass__: duplicate name
 def test_duplicate_name_raises():
     class _UniqueSettings(BaseGeneratorSettings):
         pass
@@ -108,9 +98,7 @@ def test_duplicate_name_raises():
                 return ""
 
 
-# ── AbstractEnvGenerator: config must inherit BaseEnvGeneratorSettings ────────
-
-
+# AbstractEnvGenerator: config must inherit BaseEnvGeneratorSettings
 def test_env_generator_non_env_config_raises():
     class _PlainSettings(BaseGeneratorSettings):
         pass
@@ -125,9 +113,7 @@ def test_env_generator_non_env_config_raises():
                 return ""
 
 
-# ── AbstractEnvGenerator.apply_env_case ──────────────────────────────────────
-
-
+# AbstractEnvGenerator.apply_env_case
 @pytest.mark.parametrize(
     ("to_upper_case", "case_sensitive", "expected"),
     [
@@ -146,9 +132,7 @@ def test_apply_env_case_contract(to_upper_case: bool, case_sensitive: bool, expe
     assert result == expected
 
 
-# ── file_paths ────────────────────────────────────────────────────────────────
-
-
+# file_paths
 def test_file_paths_empty_when_no_paths(file_paths_gen: type[AbstractGenerator]) -> None:  # type: ignore[type-arg]
     gen = file_paths_gen(generator_config=file_paths_gen.config(paths=[]))
     assert gen.file_paths() == []
