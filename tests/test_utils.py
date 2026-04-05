@@ -316,18 +316,18 @@ def test_find_settings_in_module_excludes_reimported() -> None:
 
 def test_find_settings_in_module_excludes_base_settings_itself() -> None:
     """BaseSettings itself is never returned."""
+    from unittest.mock import patch
+
     from pydantic_settings import BaseSettings
 
     module = types.ModuleType("_test_base_mod")
     module.__name__ = "_test_base_mod"
     module.BaseSettings = BaseSettings  # type: ignore[attr-defined]
-    BaseSettings.__module__ = "_test_base_mod"  # type: ignore[attr-defined]
 
-    try:
+    with patch.object(BaseSettings, "__module__", "_test_base_mod"):
         result = _find_settings_in_module(module)
-        assert BaseSettings not in result
-    finally:
-        BaseSettings.__module__ = "pydantic_settings.main"  # type: ignore[attr-defined]
+
+    assert BaseSettings not in result
 
 
 # =============================================================================

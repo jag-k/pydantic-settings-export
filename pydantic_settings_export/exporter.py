@@ -1,6 +1,7 @@
 import warnings
 from pathlib import Path
 
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.generators.abstract import AbstractGenerator
@@ -53,7 +54,7 @@ class Exporter:
             for string in strings:
                 try:
                     result.extend(import_settings_from_string(string))
-                except Exception as e:
+                except (ImportError, ValueError, ValidationError) as e:
                     warnings.warn(f"Failed to import settings {string!r}: {e}", stacklevel=3)
             return result
 
