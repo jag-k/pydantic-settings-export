@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 from pydantic_settings_export.generators.abstract import AbstractGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
+from pydantic_settings_export.utils import import_settings_from_string
 
 __all__ = ("Exporter",)
 
@@ -31,20 +32,46 @@ class Exporter:
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
         """Run all generators for the given settings.
 
-        :param settings: The settings to generate documentation for.
+        Each generator config can override or extend the global *settings* via its
+        ``settings`` (full override) or ``extend_settings`` (appended) fields.
+        All unique settings objects are parsed into
+        :class:`~pydantic_settings_export.models.SettingsInfoModel` exactly once.
+
+        :param settings: The default settings to generate documentation for.
         :return: The paths to generated documentation.
         """
-        settings_infos: list[SettingsInfoModel] = [
-            SettingsInfoModel.from_settings_model(s, self.settings) for s in settings
-        ]
+        cache: dict[int, SettingsInfoModel] = {}
+
+        def _parse(s: BaseSettings | type[BaseSettings]) -> SettingsInfoModel:
+            key = id(s)
+            if key not in cache:
+                cache[key] = SettingsInfoModel.from_settings_model(s, self.settings)
+            return cache[key]
+
+        def _import_all(strings: list[str]) -> list[BaseSettings | type[BaseSettings]]:
+            result: list[BaseSettings | type[BaseSettings]] = []
+            for string in strings:
+                try:
+                    result.extend(import_settings_from_string(string))
+                except Exception as e:
+                    warnings.warn(f"Failed to import settings {string!r}: {e}", stacklevel=3)
+            return result
+
+        default_infos = [_parse(s) for s in settings]
         paths: list[Path] = []
 
         for generator in self.generators:
             try:
-                # Run all generators for each setting info
-                paths.extend(generator.run(*settings_infos))
+                config = generator.generator_config
+                if config.settings:
+                    gen_infos = [_parse(s) for s in _import_all(config.settings)]
+                elif config.extend_settings:
+                    gen_infos = default_infos + [_parse(s) for s in _import_all(config.extend_settings)]
+                else:
+                    gen_infos = default_infos
+
+                paths.extend(generator.run(*gen_infos))
             except Exception as e:
                 warnings.warn(f"Generator {generator.__class__.__name__} failed: {e}", stacklevel=2)
-            continue
 
         return paths

@@ -369,6 +369,14 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     if not settings:
         parser.exit(1, parser.format_help())
 
+    # Print loaded settings summary
+    def _settings_name(obj: BaseSettings | type[BaseSettings]) -> str:
+        cls = obj if isinstance(obj, type) else type(obj)
+        return f"{cls.__module__}:{cls.__name__}"
+
+    names = "\n".join(f"  - {_settings_name(obj)}" for obj in settings)
+    print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
+
     # Run main settings export
     exporter = Exporter(s, s.get_generators())
     try:

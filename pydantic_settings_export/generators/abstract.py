@@ -36,6 +36,25 @@ class BaseGeneratorSettings(BaseModel):
         description="The paths to the resulting files.",
     )
 
+    settings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Override the global ``default_settings`` for this generator configuration. "
+            "When non-empty, only these settings are exported — ``default_settings`` and "
+            "``extend_settings`` are ignored for this generator."
+        ),
+        examples=[["app.settings:MySettings"]],
+    )
+
+    extend_settings: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Additional settings to include alongside the global ``default_settings`` "
+            "for this generator configuration. Ignored when ``settings`` is non-empty."
+        ),
+        examples=[["app.extra_settings:ExtraSettings"]],
+    )
+
     def __bool__(self) -> bool:
         """Check if the configuration file is set."""
         return self.enabled and bool(self.paths)
@@ -137,7 +156,6 @@ class AbstractGenerator(ABC, Generic[C]):
         """Get the list of files which need to create/update.
 
         :return: The list of files to write.
-        This is used to determine if the files need to be written.
         """
         if not self.generator_config:
             return []
@@ -155,10 +173,9 @@ class AbstractGenerator(ABC, Generic[C]):
         :param settings_info: The settings info to generate documentation for.
         :return: The list of file paths is written to.
         """
-        result = self.generate(*settings_info)
-        file_paths = self.file_paths()
         updated_files: list[Path] = []
-        for path in file_paths:
+        result = self.generate(*settings_info)
+        for path in self.file_paths():
             if path.is_file() and path.read_text() == result:
                 # No need to update the file
                 continue
