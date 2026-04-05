@@ -327,21 +327,24 @@ def test_uv_venv_fallback_via_run(tmp_path):
 
 def test_auto_detect_venv_finds_venv(tmp_path):
     _make_venv(tmp_path / "venv")
-    result = _auto_detect_venv(tmp_path)
-    assert len(result) == 1
+    packages, method = _auto_detect_venv(tmp_path)
+    assert len(packages) == 1
+    assert method == "venv"
 
 
 def test_auto_detect_venv_finds_dot_venv(tmp_path):
     _make_venv(tmp_path / ".venv")
-    result = _auto_detect_venv(tmp_path)
-    assert len(result) == 1
+    packages, method = _auto_detect_venv(tmp_path)
+    assert len(packages) == 1
+    assert method == ".venv"
 
 
 def test_auto_detect_venv_prefers_venv_over_dot_venv(tmp_path):
     _make_venv(tmp_path / "venv")
     _make_venv(tmp_path / ".venv")
-    result = _auto_detect_venv(tmp_path)
-    assert str(tmp_path / "venv") in str(result[0])
+    packages, method = _auto_detect_venv(tmp_path)
+    assert str(tmp_path / "venv") in str(packages[0])
+    assert method == "venv"
 
 
 def test_auto_detect_venv_falls_back_to_poetry(tmp_path):
@@ -357,14 +360,63 @@ def test_auto_detect_venv_falls_back_to_poetry(tmp_path):
         patch("pydantic_settings_export.venv.shutil.which", return_value="/usr/bin/poetry"),
         patch("pydantic_settings_export.venv.subprocess.run", return_value=mock_result),
     ):
-        result = _auto_detect_venv(tmp_path)
-    assert len(result) == 1
+        packages, method = _auto_detect_venv(tmp_path)
+    assert len(packages) == 1
+    assert method == "poetry"
+
+
+def test_auto_detect_venv_standard_venv_beats_uv(tmp_path):
+    """Regression: ./venv must take precedence over uv-managed venv."""
+    standard_venv = _make_venv(tmp_path / "venv")
+    sp_str = str(standard_venv / "lib" / "python3.11" / "site-packages")
+
+    uv_sp = tmp_path / ".uv-sp"
+    uv_sp.mkdir()
+    mock_result = MagicMock(returncode=0, stdout=str(uv_sp) + "\n")
+    (tmp_path / "uv.lock").write_text("")
+
+    with (
+        patch("pydantic_settings_export.venv.shutil.which", return_value="/usr/bin/uv"),
+        patch("pydantic_settings_export.venv.subprocess.run", return_value=mock_result),
+    ):
+        packages, method = _auto_detect_venv(tmp_path)
+
+    assert len(packages) == 1
+    assert str(packages[0]) == sp_str
+    assert method == "venv"
+
+
+def test_auto_detect_venv_uv_beats_poetry(tmp_path):
+    """Regression: uv must take precedence over Poetry when no ./venv exists."""
+    uv_venv = _make_venv(tmp_path / ".venv")
+    (tmp_path / "uv.lock").write_text("")
+    (tmp_path / "pyproject.toml").write_text("[tool.poetry]\nname = 'test'\n")
+
+    poetry_root = tmp_path / ".poetry-venv"
+    poetry_root.mkdir()
+    (poetry_root / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (poetry_root / "lib" / "python3.11" / "site-packages").mkdir(parents=True)
+    poetry_mock = MagicMock(returncode=0, stdout=str(poetry_root) + "\n", stderr="")
+
+    def which_side_effect(cmd):
+        return f"/usr/bin/{cmd}"
+
+    with (
+        patch("pydantic_settings_export.venv.shutil.which", side_effect=which_side_effect),
+        patch("pydantic_settings_export.venv.subprocess.run", return_value=poetry_mock),
+    ):
+        packages, method = _auto_detect_venv(tmp_path)
+
+    assert len(packages) == 1
+    assert str(uv_venv / "lib" / "python3.11" / "site-packages") == str(packages[0])
+    assert method == ".venv"
 
 
 def test_auto_detect_venv_none_found(tmp_path):
     with patch("pydantic_settings_export.venv.shutil.which", return_value=None):
-        result = _auto_detect_venv(tmp_path)
-    assert result == []
+        packages, method = _auto_detect_venv(tmp_path)
+    assert packages == []
+    assert method == ""
 
 
 # =============================================================================

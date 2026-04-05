@@ -261,7 +261,7 @@ def _uv_venv(project_dir: Path, *, explicit: bool = False) -> list[Path]:
     return []
 
 
-def _auto_detect_venv(project_dir: Path) -> list[Path]:
+def _auto_detect_venv(project_dir: Path) -> tuple[list[Path], str]:
     """Auto-detect a virtual environment in the project directory.
 
     Detection order:
@@ -272,29 +272,29 @@ def _auto_detect_venv(project_dir: Path) -> list[Path]:
     4. Poetry (if the ``poetry`` CLI and project config are present)
 
     :param project_dir: The project directory.
-    :return: List of site-packages directories from the detected venv.
+    :return: Tuple of (site-packages directories, detection method name).
     """
     for subdir in ("venv", ".venv"):
         packages = _venv_from_path(project_dir / subdir)
         if packages:
             logger.debug("Auto-detected venv at %s/%s", project_dir, subdir)
-            return packages
+            return packages, subdir
 
     packages = _uv_venv(project_dir)
     if packages:
         logger.debug("Auto-detected uv venv for %s", project_dir)
-        return packages
+        return packages, "uv"
 
     packages = _poetry_venv(project_dir)
     if packages:
         logger.debug("Auto-detected Poetry venv for %s", project_dir)
-        return packages
+        return packages, "poetry"
 
     logger.debug("No virtual environment auto-detected for %s", project_dir)
-    return []
+    return [], ""
 
 
-def setup_venv_sys_path(venv: str | None, project_dir: Path) -> None:
+def setup_venv_sys_path(venv: str | None, project_dir: Path) -> tuple[list[Path], str]:
     """Add the virtual environment's site-packages to :data:`sys.path`.
 
     :param venv: The venv configuration value:
@@ -306,24 +306,33 @@ def setup_venv_sys_path(venv: str | None, project_dir: Path) -> None:
         - Any other non-empty string — treated as a path to the venv directory;
           relative paths are resolved against *project_dir*.
     :param project_dir: The project directory used for detection and resolving relative paths.
+    :return: Tuple of (site-packages directories added to sys.path, display label).
     """
     if not venv:
-        return
+        return [], ""
 
+    label: str
     if venv == "auto":
-        packages = _auto_detect_venv(project_dir)
+        packages, method = _auto_detect_venv(project_dir)
+        label = f"auto ({method})" if method else "auto"
     elif venv == "poetry":
         packages = _poetry_venv(project_dir, explicit=True)
+        label = "poetry"
     elif venv == "uv":
         packages = _uv_venv(project_dir, explicit=True)
+        label = "uv"
     else:
         venv_path = Path(venv)
         if not venv_path.is_absolute():
             venv_path = project_dir / venv_path
         packages = _venv_from_path(venv_path, explicit=True)
+        label = venv
 
+    added: list[Path] = []
     for pkg in packages:
         pkg_str = str(pkg)
         if pkg_str not in sys.path:
             sys.path.insert(0, pkg_str)
             logger.debug("Added %s to sys.path", pkg_str)
+            added.append(pkg)
+    return added, label

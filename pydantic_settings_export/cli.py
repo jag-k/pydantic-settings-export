@@ -137,6 +137,8 @@ class PSECLISettings(PSESettings):
                 if not g:
                     warnings.warn(f"Generator {name!r} not found", stacklevel=2)
                     continue
+                if not gen_config:
+                    continue
                 try:
                     result.append(g(self, gen_config))
                 except Exception as e:
@@ -328,13 +330,13 @@ def _setup_settings(
     config_file: Path | None = None,
     project_dir: Path | None = None,
     venv: str | None = None,
-) -> PSECLISettings:
+) -> tuple[PSECLISettings, list[Path], str]:
     """Initialize and configure PSECLISettings.
 
     :param config_file: Path to the configuration file
     :param project_dir: Path to the project directory
     :param venv: Override the venv setting from CLI (None means use pyproject.toml value)
-    :return: Configured PSECLISettings instance
+    :return: Tuple of (configured PSECLISettings instance, venv packages added, venv display label)
     """
     if config_file:
         PSECLISettings.model_config["toml_file"] = config_file
@@ -344,9 +346,9 @@ def _setup_settings(
         s.project_dir = project_dir.resolve().absolute()
     if venv is not None:
         s.venv = venv or None
-    setup_venv_sys_path(s.venv, s.project_dir)
+    venv_packages, venv_label = setup_venv_sys_path(s.venv, s.project_dir)
     sys.path.insert(0, str(s.project_dir))
-    return s
+    return s, venv_packages, venv_label
 
 
 def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) -> list[type[AbstractGenerator]]:
@@ -372,7 +374,12 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     _load_env_files(args.env_file)
 
     # Setup settings
-    s = _setup_settings(args.config_file, args.project_dir, args.venv)
+    try:
+        s, venv_packages, venv_label = _setup_settings(args.config_file, args.project_dir, args.venv)
+    except (RuntimeError, FileNotFoundError, ValueError) as e:
+        parser.error(f"Venv configuration error: {e}")
+    except Exception as e:
+        parser.error(f"Failed to initialize settings: {e}")
 
     # Process generators
     generators = _process_generators(args.generator)
@@ -390,6 +397,10 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     def _settings_name(obj: BaseSettings | type[BaseSettings]) -> str:
         cls = obj if isinstance(obj, type) else type(obj)
         return f"{cls.__module__}:{cls.__name__}"
+
+    if venv_packages:
+        pkg_str = ", ".join(str(p.resolve()) for p in venv_packages)
+        print(f"Resolved venv [{venv_label}]: {pkg_str}")
 
     names = "\n".join(f"  - {_settings_name(obj)}" for obj in settings)
     print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
