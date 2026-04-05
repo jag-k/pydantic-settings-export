@@ -1713,3 +1713,194 @@ class TestAliasDuplication:
             assert s.verification_email == "alias_val"
         finally:
             del os.environ["GMAIL_USER_VERIFICATION_EMAIL"]
+
+
+# =============================================================================
+# CASE: Nested BaseSettings with own env_prefix (no parent env_nested_delimiter)
+# =============================================================================
+
+
+class TestNestedBaseSettingsOwnPrefix:
+    """Nested BaseSettings with its own env_prefix, parent has no env_nested_delimiter.
+
+    Key insight verified here: pydantic-settings always calls BaseSettings.__init__
+    when constructing a nested model — even via default_factory or parent's JSON env var.
+    That means the child's own env_prefix is ALWAYS active and the flat vars DO work.
+
+    PSE must show the flat vars (CHILD_HOST, CHILD_PORT) in its output, not a JSON blob.
+    """
+
+    @pytest.fixture
+    def settings_cls(self) -> type[BaseSettings]:
+        class ChildSettings(BaseSettings):
+            model_config = SettingsConfigDict(env_prefix="CHILD_")
+
+            host: str = Field(default="localhost", description="Child host")
+            port: int = Field(default=9000, description="Child port")
+
+        class ParentSettings(BaseSettings):
+            """Parent with no env_nested_delimiter."""
+
+            name: str = Field(default="parent", description="Parent name")
+            child: ChildSettings = Field(default_factory=ChildSettings)
+
+        return ParentSettings
+
+    def test_child_flat_vars_actually_work(self, settings_cls):
+        """Flat vars via child's own prefix are resolved by pydantic-settings."""
+        os.environ["CHILD_HOST"] = "from_env"
+        os.environ["CHILD_PORT"] = "1234"
+        try:
+            s = settings_cls()
+            assert s.child.host == "from_env"
+            assert s.child.port == 1234
+        finally:
+            del os.environ["CHILD_HOST"]
+            del os.environ["CHILD_PORT"]
+
+    def test_child_is_env_accessible(self, settings_cls):
+        """SettingsInfoModel marks child with own prefix as env_accessible=True."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        assert len(info.child_settings) == 1
+        child = info.child_settings[0]
+        assert child.env_accessible is True
+
+    def test_child_prefix_is_own(self, settings_cls):
+        """Child's env_prefix must be its own 'CHILD_', not empty."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        child = info.child_settings[0]
+        assert child.env_prefix == "CHILD_"
+
+    def test_child_fields_have_env_names(self, settings_cls):
+        """Child fields must have proper env_names derived from its own prefix."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        child = info.child_settings[0]
+        env_names_by_field = {f.name: f.env_names for f in child.fields}
+        # Keys are field names; values are lists of env var names (lowercase before normalization)
+        assert "host" in env_names_by_field
+        assert "port" in env_names_by_field
+        # env_names should contain the prefixed name (compare lowercased)
+        assert any("child_host" in n.lower() for n in env_names_by_field["host"])
+        assert any("child_port" in n.lower() for n in env_names_by_field["port"])
+
+    def test_dotenv_shows_flat_vars(self, settings_cls):
+        """Dotenv output must contain flat CHILD_HOST/CHILD_PORT, not CHILD={...}."""
+        result = get_dotenv_output(settings_cls)
+        # Flat vars must be present
+        assert "CHILD_HOST" in result
+        assert "CHILD_PORT" in result
+        # JSON blob must NOT be present
+        assert "CHILD={" not in result
+        assert 'CHILD="' not in result
+
+    def test_no_synthetic_json_field_in_parent(self, settings_cls):
+        """Parent's fields list must not contain a synthetic JSON field for child."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        parent_field_names = [f.name for f in info.fields]
+        assert "child" not in parent_field_names
+
+
+class TestNestedBaseSettingsThreeLevels:
+    """Three-level deep nesting: Parent → Child(CHILD_) → Grand(CHILD_GRAND_).
+
+    All flat vars must be accessible and shown — no JSON blobs at any level.
+    """
+
+    @pytest.fixture
+    def settings_cls(self) -> type[BaseSettings]:
+        class GrandSettings(BaseSettings):
+            model_config = SettingsConfigDict(env_prefix="CHILD_GRAND_")
+
+            value: str = Field(default="grand_default", description="Grand value")
+
+        class ChildSettings(BaseSettings):
+            model_config = SettingsConfigDict(env_prefix="CHILD_")
+
+            host: str = Field(default="localhost", description="Child host")
+            grand: GrandSettings = Field(default_factory=GrandSettings)
+
+        class ParentSettings(BaseSettings):
+            child: ChildSettings = Field(default_factory=ChildSettings)
+
+        return ParentSettings
+
+    def test_grandchild_flat_vars_actually_work(self, settings_cls):
+        """Grandchild's flat vars work via 2-deep default_factory chain."""
+        os.environ["CHILD_HOST"] = "child_env"
+        os.environ["CHILD_GRAND_VALUE"] = "grand_env"
+        try:
+            s = settings_cls()
+            assert s.child.host == "child_env"
+            assert s.child.grand.value == "grand_env"
+        finally:
+            del os.environ["CHILD_HOST"]
+            del os.environ["CHILD_GRAND_VALUE"]
+
+    def test_all_children_env_accessible(self, settings_cls):
+        """Both child and grandchild must be env_accessible=True."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        child = info.child_settings[0]
+        assert child.env_accessible is True
+        grand = child.child_settings[0]
+        assert grand.env_accessible is True
+
+    def test_grandchild_prefix(self, settings_cls):
+        """Grandchild must carry its own env_prefix 'CHILD_GRAND_'."""
+        info = SettingsInfoModel.from_settings_model(settings_cls)
+        grand = info.child_settings[0].child_settings[0]
+        assert grand.env_prefix == "CHILD_GRAND_"
+
+    def test_dotenv_shows_all_flat_vars(self, settings_cls):
+        """All flat vars from all levels must appear in dotenv output."""
+        result = get_dotenv_output(settings_cls)
+        assert "CHILD_HOST" in result
+        assert "CHILD_GRAND_VALUE" in result
+        # No JSON blobs
+        assert "CHILD={" not in result
+        assert "CHILD_GRAND={" not in result
+
+
+class TestNestedBaseSettingsParentHasDelimiter:
+    """Parent has env_nested_delimiter; child also has own env_prefix.
+
+    When parent has a delimiter, the delimiter path is the primary one.
+    Child's own-prefix vars still work at runtime (via default_factory)
+    but PSE should show the delimiter-based names as primary.
+    """
+
+    @pytest.fixture
+    def settings_cls(self) -> type[BaseSettings]:
+        class ChildSettings(BaseSettings):
+            model_config = SettingsConfigDict(env_prefix="CHILD_")
+
+            host: str = Field(default="localhost")
+
+        class ParentSettings(BaseSettings):
+            model_config = SettingsConfigDict(env_nested_delimiter="__")
+
+            child: ChildSettings = Field(default_factory=ChildSettings)
+
+        return ParentSettings
+
+    def test_delimiter_path_is_primary(self, settings_cls):
+        """With parent delimiter, PARENT__CHILD__HOST= is the primary path."""
+        os.environ["CHILD__HOST"] = "via_delimiter"
+        try:
+            s = settings_cls()
+            assert s.child.host == "via_delimiter"
+        finally:
+            del os.environ["CHILD__HOST"]
+
+    def test_own_prefix_still_works(self, settings_cls):
+        """Child's own prefix CHILD_HOST= still works (via default_factory)."""
+        os.environ["CHILD_HOST"] = "via_own_prefix"
+        try:
+            s = settings_cls()
+            assert s.child.host == "via_own_prefix"
+        finally:
+            del os.environ["CHILD_HOST"]
+
+    def test_dotenv_shows_delimiter_names(self, settings_cls):
+        """With parent delimiter, dotenv uses delimiter-based names."""
+        result = get_dotenv_output(settings_cls)
+        assert "CHILD__HOST" in result

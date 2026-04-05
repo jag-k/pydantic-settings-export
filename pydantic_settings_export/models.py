@@ -542,17 +542,34 @@ class SettingsInfoModel(BaseModel):
             # env_accessible=True children are expanded; False ones appear as JSON fields.
             if isclass(annotation) and issubclass(annotation, (BaseModel, BaseSettings)):
                 child_instance = getattr(instance, name, None) if instance else None
-                env_expandable = nested_delimiter is not None
-                if env_expandable:
+
+                # A BaseSettings subclass with its own env_prefix is always independently
+                # accessible via that prefix (BaseSettings.__init__ always runs its own env
+                # sources, regardless of parent's nested_delimiter or default_factory path).
+                has_own_prefix = issubclass(annotation, BaseSettings) and bool(
+                    annotation.model_config.get("env_prefix", "")
+                )
+                env_expandable = nested_delimiter is not None or has_own_prefix
+
+                if nested_delimiter is not None:
+                    # Parent-delimiter path: {prefix}{field}{delimiter}{subfield}=value
                     child_prefix = f"{prefix}{name}{nested_delimiter}"
+                    child_nested_delimiter: str | None = nested_delimiter
+                elif has_own_prefix:
+                    # Own-prefix path: child is a standalone BaseSettings with its own prefix.
+                    # Use child's own env_prefix and its own nested_delimiter (if any).
+                    child_prefix = str(annotation.model_config.get("env_prefix", ""))
+                    child_nested_delimiter = annotation.model_config.get("env_nested_delimiter") or None  # type: ignore[assignment]
                 else:
                     child_prefix = ""  # no env prefix — fields will have empty env_names
+                    child_nested_delimiter = None
+
                 child_settings.append(
                     cls.from_settings_model(
                         child_instance if child_instance else cast(type[BaseSettings], annotation),
                         global_settings=global_settings,
                         prefix=child_prefix,
-                        nested_delimiter=nested_delimiter if env_expandable else None,
+                        nested_delimiter=child_nested_delimiter if env_expandable else None,
                         field_name=name,
                         case_sensitive=case_sensitive,
                         env_accessible=env_expandable,
