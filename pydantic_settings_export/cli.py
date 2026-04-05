@@ -17,6 +17,7 @@ from pydantic_settings_export.generators.simple import SimpleGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
 from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
+from pydantic_settings_export.venv import setup_venv_sys_path
 from pydantic_settings_export.version import __version__
 
 if sys.version_info < (3, 11):
@@ -74,9 +75,9 @@ class PSECLISettings(PSESettings):
     )
 
     @property
-    def settings(self) -> list[BaseSettings]:
-        """Get the settings."""
-        return [import_settings_from_string(i) for i in self.default_settings or []]
+    def settings(self) -> list[BaseSettings | type[BaseSettings]]:
+        """Get the settings from the default_settings list."""
+        return [obj for string in (self.default_settings or []) for obj in import_settings_from_string(string)]
 
     @model_validator(mode="before")
     @classmethod
@@ -135,6 +136,8 @@ class PSECLISettings(PSESettings):
                 g = all_generators.get(name)
                 if not g:
                     warnings.warn(f"Generator {name!r} not found", stacklevel=2)
+                    continue
+                if not gen_config:
                     continue
                 try:
                     result.append(g(self, gen_config))
@@ -269,6 +272,17 @@ def make_parser() -> argparse.ArgumentParser:
         help="Use the .env file to load environment variables. Can be used multiple times. (default: [])",
     )
     config_group.add_argument(
+        "--venv",
+        default=None,
+        metavar="VENV",
+        help=(
+            "Virtual environment to use when importing settings. "
+            "Values: 'auto' (./venv, ./.venv, uv, poetry), "
+            "'uv', 'poetry', a path to the venv dir, or '' to disable. "
+            "(default: value from pyproject.toml or 'auto')"
+        ),
+    )
+    config_group.add_argument(
         "--generator",
         "-g",
         nargs="*",
@@ -315,12 +329,14 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
 def _setup_settings(
     config_file: Path | None = None,
     project_dir: Path | None = None,
-) -> PSECLISettings:
+    venv: str | None = None,
+) -> tuple[PSECLISettings, list[Path], str]:
     """Initialize and configure PSECLISettings.
 
     :param config_file: Path to the configuration file
     :param project_dir: Path to the project directory
-    :return: Configured PSECLISettings instance
+    :param venv: Override the venv setting from CLI (None means use pyproject.toml value)
+    :return: Tuple of (configured PSECLISettings instance, venv packages added, venv display label)
     """
     if config_file:
         PSECLISettings.model_config["toml_file"] = config_file
@@ -328,8 +344,11 @@ def _setup_settings(
 
     if project_dir:
         s.project_dir = project_dir.resolve().absolute()
+    if venv is not None:
+        s.venv = venv or None
+    venv_packages, venv_label = setup_venv_sys_path(s.venv, s.project_dir)
     sys.path.insert(0, str(s.project_dir))
-    return s
+    return s, venv_packages, venv_label
 
 
 def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) -> list[type[AbstractGenerator]]:
@@ -355,7 +374,12 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     _load_env_files(args.env_file)
 
     # Setup settings
-    s = _setup_settings(args.config_file, args.project_dir)
+    try:
+        s, venv_packages, venv_label = _setup_settings(args.config_file, args.project_dir, args.venv)
+    except (RuntimeError, FileNotFoundError, ValueError) as e:
+        parser.error(f"Venv configuration error: {e}")
+    except Exception as e:
+        parser.error(f"Failed to initialize settings: {e}")
 
     # Process generators
     generators = _process_generators(args.generator)
@@ -368,6 +392,18 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     settings = s.settings
     if not settings:
         parser.exit(1, parser.format_help())
+
+    # Print loaded settings summary
+    def _settings_name(obj: BaseSettings | type[BaseSettings]) -> str:
+        cls = obj if isinstance(obj, type) else type(obj)
+        return f"{cls.__module__}:{cls.__name__}"
+
+    if venv_packages:
+        pkg_str = ", ".join(str(p.resolve()) for p in venv_packages)
+        print(f"Resolved venv [{venv_label}]: {pkg_str}")
+
+    names = "\n".join(f"  - {_settings_name(obj)}" for obj in settings)
+    print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
 
     # Run main settings export
     exporter = Exporter(s, s.get_generators())

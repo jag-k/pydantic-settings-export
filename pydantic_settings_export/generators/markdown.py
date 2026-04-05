@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
-from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
+from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, format_types, value_repr
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
-from .abstract import AbstractGenerator, BaseGeneratorSettings
+from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -43,7 +43,7 @@ TableHeaders: list[TableHeadersEnum] = list(TableHeadersEnum.__members__.values(
 UNION_SEPARATOR = " | "
 
 
-class MarkdownSettings(BaseGeneratorSettings):
+class MarkdownSettings(BaseEnvGeneratorSettings):
     """Settings for the Markdown file."""
 
     model_config = ConfigDict(title="Generator: Markdown Configuration File Settings")
@@ -73,11 +73,6 @@ class MarkdownSettings(BaseGeneratorSettings):
         "# Configuration\n\nHere you can find all available configuration options using ENV variables.\n\n",
         description="The prefix of the result configuration file.",
         examples=[""],
-    )
-
-    to_upper_case: bool = Field(
-        True,
-        description="Convert the field names to upper case.",
     )
 
     table_headers: list[TableHeadersEnum] = Field(
@@ -145,42 +140,7 @@ class MarkdownSettings(BaseGeneratorSettings):
         return self.enabled and bool(self.paths)
 
 
-def _make_table_row(
-    settings_info: SettingsInfoModel,
-    field: FieldInfoModel,
-    md_settings: MarkdownSettings,
-) -> TableRowDict:
-    """Make a table row dictionary from a field."""
-    name = q(settings_info.env_prefix + field.name)
-
-    if field.aliases:
-        name = UNION_SEPARATOR.join(q(a) for a in field.aliases)
-
-    if md_settings.to_upper_case:
-        name = name.upper()
-
-    if field.deprecated:
-        name += " (⚠️ Deprecated)"
-
-    default = "*required*"
-    if not field.is_required:
-        default = q(field.default)
-
-    example: str | None = None
-    if field.examples:
-        example = ", ".join(q(example) for example in field.examples)
-    types = UNION_SEPARATOR.join(q(t) for t in field.types)
-
-    return TableRowDict(
-        Name=name,
-        Type=types,
-        Default=default,
-        Description=field.description or "",
-        Example=example,
-    )
-
-
-class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
+class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
     """The Markdown configuration file generator."""
 
     name = "markdown"
@@ -190,6 +150,49 @@ class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
         return make_pretty_md_table_from_dict(
             cast(list[dict[str, str | None]], rows),
             headers=[h.value for h in self.generator_config.table_headers],
+        )
+
+    def _make_table_row(
+        self,
+        settings_info: SettingsInfoModel,
+        field: FieldInfoModel,
+        md_settings: MarkdownSettings,
+    ) -> TableRowDict:
+        """Make a table row dictionary from a field."""
+        if field.env_names:
+            names = [
+                self.apply_env_case(
+                    n, to_upper_case=md_settings.to_upper_case, case_sensitive=settings_info.case_sensitive
+                )
+                for n in field.env_names
+            ]
+            name = UNION_SEPARATOR.join(q(n) for n in names)
+        else:
+            raw = f"{settings_info.env_prefix}{field.name}"
+            name = q(
+                self.apply_env_case(
+                    raw, to_upper_case=md_settings.to_upper_case, case_sensitive=settings_info.case_sensitive
+                )
+            )
+
+        if field.deprecated:
+            name += " (⚠️ Deprecated)"
+
+        default = "*required*"
+        if not field.is_required:
+            default = q(value_repr(field.default))
+
+        example: str | None = None
+        if field.examples:
+            example = ", ".join(q(value_repr(ex)) for ex in field.examples)
+        types = UNION_SEPARATOR.join(q(t) for t in format_types(field.types))
+
+        return TableRowDict(
+            Name=name,
+            Type=types,
+            Default=default,
+            Description=field.description or "",
+            Example=example,
         )
 
     @staticmethod
@@ -244,11 +247,16 @@ class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
 
             # Add an environment prefix if it exists
             if settings_info.env_prefix:
-                result += f"**Environment Prefix**: `{settings_info.env_prefix}`\n\n"
+                prefix_display = self.apply_env_case(
+                    settings_info.env_prefix,
+                    to_upper_case=self.generator_config.to_upper_case,
+                    case_sensitive=settings_info.case_sensitive,
+                )
+                result += f"**Environment Prefix**: `{prefix_display}`\n\n"
 
         # Generate fields
         rows: list[TableRowDict] = [
-            _make_table_row(settings_info, field, self.generator_config) for field in settings_info.fields
+            self._make_table_row(settings_info, field, self.generator_config) for field in settings_info.fields
         ]
 
         if rows:
@@ -261,7 +269,7 @@ class MarkdownGenerator(AbstractGenerator[MarkdownSettings]):
 
     def _single_table(self, settings_info: SettingsInfoModel) -> list[TableRowDict]:
         rows: list[TableRowDict] = []
-        rows.extend(_make_table_row(settings_info, field, self.generator_config) for field in settings_info.fields)
+        rows.extend(self._make_table_row(settings_info, field, self.generator_config) for field in settings_info.fields)
         for child in settings_info.child_settings:
             rows.extend(self._single_table(child))
         return rows

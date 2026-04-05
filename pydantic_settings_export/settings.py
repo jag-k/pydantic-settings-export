@@ -32,10 +32,16 @@ class PSESettings(TomlSettings):
 
     default_settings: list[str] = Field(
         default_factory=list,
-        description="The default settings to use. The settings are applied in the order they are listed.",
+        description=(
+            "The default settings to use. The settings are applied in the order they are listed. "
+            "Each entry can be either 'module:attribute' to import a specific class or instance, "
+            "or a plain module path (e.g. 'app.settings') to auto-discover all BaseSettings "
+            "subclasses defined in that module."
+        ),
         examples=[
             ["settings:settings"],
             ["app.config.settings:Settings", "app.config.settings.dev:Settings"],
+            ["app.config.settings"],
         ],
     )
 
@@ -50,6 +56,20 @@ class PSESettings(TomlSettings):
     project_dir: Path = Field(
         Path.cwd(),
         description="The project directory. Used for importing settings.",
+    )
+
+    venv: str | None = Field(
+        "auto",
+        description=(
+            "Virtual environment to use when importing settings. "
+            "Possible values: "
+            "'auto' (auto-detect from ./venv, ./.venv, uv, or poetry), "
+            "'uv' (use uv-managed venv), "
+            "'poetry' (use Poetry-managed venv), "
+            "a path to the venv directory (relative paths are resolved from project_dir), "
+            "or null/empty string to disable."
+        ),
+        examples=["auto", "poetry", "uv", "./.venv", "/path/to/.venv"],
     )
 
     relative_to: RelativeToSettings = Field(

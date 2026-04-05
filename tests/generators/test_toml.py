@@ -159,15 +159,18 @@ def test_toml_generator_with_long_descriptions() -> None:
 
 
 def test_toml_generator_with_description_transformer() -> None:
-    """Test description formatter callback."""
+    """Test description formatter override via subclassing."""
 
-    def uppercase(desc: str) -> str:
-        return desc.upper()
+    class UpperCaseTomlGenerator(TomlGenerator):
+        name = "toml-uppercase"
+
+        def _format_description_comment(self, description: str) -> str:
+            return description.upper()
 
     class Settings(BaseSettings):
         field: str = Field(default="value", description="lowercase text")
 
-    generator = TomlGenerator(generator_config=TomlSettings(description_formatter=uppercase))
+    generator = UpperCaseTomlGenerator()
     result = generator.generate(SettingsInfoModel.from_settings_model(Settings))
 
     expected = """\
@@ -182,13 +185,13 @@ def test_toml_generator_with_description_transformer() -> None:
 
 
 def test_toml_generator_without_formatters(simple_settings: type[BaseSettings]) -> None:
-    """Test TOML generation without any formatters."""
+    """Test TOML generation with all comment sections disabled."""
     generator = TomlGenerator(
         generator_config=TomlSettings(
-            header_formatter=None,
-            type_formatter=None,
-            description_formatter=None,
-            default_formatter=None,
+            show_header=False,
+            show_types=False,
+            show_description=False,
+            show_default=False,
         )
     )
     result = generator.generate(SettingsInfoModel.from_settings_model(simple_settings))
@@ -621,5 +624,131 @@ def test_toml_generator_with_prefix(simple_settings: type[BaseSettings]) -> None
 # Field description
 # Default: "value"
 # field = "value"
+"""
+    assert result == expected
+
+
+def test_toml_instance_uses_real_value() -> None:
+    """Instance should use real value as uncommented field."""
+
+    class Settings(BaseSettings):
+        host: str = Field(default="localhost", description="The host")
+        port: int = Field(default=8080, description="The port")
+        debug: bool = Field(default=False, description="Debug mode")
+
+    instance = Settings(host="production.example.com", port=443, debug=True)
+    info = SettingsInfoModel.from_settings_model(instance)
+
+    generator = TomlGenerator(generator_config=TomlSettings(comment_defaults=False))
+    result = generator.generate(info)
+
+    expected = """\
+# Settings
+
+# host: string
+# The host
+# Default: "localhost"
+host = "production.example.com"
+
+# port: integer
+# The port
+# Default: 8080
+port = 443
+
+# debug: boolean
+# Debug mode
+# Default: false
+debug = true
+"""
+    assert result == expected
+
+
+def test_toml_instance_shows_default_in_comment() -> None:
+    """Instance should show default value in the comment section."""
+
+    class Settings(BaseSettings):
+        host: str = Field(default="localhost", description="The host")
+
+    instance = Settings(host="production.example.com")
+    info = SettingsInfoModel.from_settings_model(instance)
+
+    generator = TomlGenerator()
+    result = generator.generate(info)
+
+    expected = """\
+# Settings
+
+# host: string
+# The host
+# Default: "localhost"
+host = "production.example.com"
+"""
+    assert result == expected
+
+
+def test_toml_instance_same_as_default_behaves_like_class() -> None:
+    """When value equals default, should behave like class."""
+
+    class Settings(BaseSettings):
+        host: str = Field(default="localhost", description="The host")
+
+    instance = Settings()
+    info_instance = SettingsInfoModel.from_settings_model(instance)
+    info_class = SettingsInfoModel.from_settings_model(Settings)
+
+    generator = TomlGenerator()
+    result_instance = generator.generate(info_instance)
+    result_class = generator.generate(info_class)
+
+    expected = """\
+# Settings
+
+# host: string
+# The host
+# Default: "localhost"
+# host = "localhost"
+"""
+    assert result_instance == expected
+    assert result_class == expected
+
+
+def test_toml_nested_instance() -> None:
+    """Nested instances should propagate their values."""
+
+    class Database(BaseSettings):
+        host: str = Field(default="localhost", description="DB host")
+        port: int = Field(default=5432, description="DB port")
+
+    class AppSettings(BaseSettings):
+        debug: bool = Field(default=False, description="Debug mode")
+        database: Database = Field(default_factory=Database)
+
+    db = Database(host="prod-db.example.com", port=5433)
+    instance = AppSettings(debug=True, database=db)
+    info = SettingsInfoModel.from_settings_model(instance)
+
+    generator = TomlGenerator(generator_config=TomlSettings(comment_defaults=False))
+    result = generator.generate(info)
+
+    expected = """\
+# AppSettings
+
+# debug: boolean
+# Debug mode
+# Default: false
+debug = true
+
+# Database
+
+[database]
+# host: string
+# DB host
+# Default: "localhost"
+host = "prod-db.example.com"
+
+# port: integer
+# DB port
+# Default: 5432
+port = 5433
 """
     assert result == expected

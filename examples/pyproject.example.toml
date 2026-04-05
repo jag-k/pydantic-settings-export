@@ -4,9 +4,11 @@
 [tool.pydantic_settings_export]
 # default_settings: array
 # The default settings to use. The settings are applied in the order they are
-# listed.
+# listed. Each entry can be either 'module:attribute' to import a specific class
+# or instance, or a plain module path (e.g. 'app.settings') to auto-discover all
+# BaseSettings subclasses defined in that module.
 # Default: []
-# Examples: ["settings:settings"], ["app.config.settings:Settings","app.config.settings.dev:Settings"]
+# Examples: ["settings:settings"], ["app.config.settings:Settings","app.config.settings.dev:Settings"], ["app.config.settings"]
 # default_settings = []
 
 # root_dir: Path
@@ -19,6 +21,15 @@
 # The project directory. Used for importing settings.
 # Default: "<project_dir>"
 # project_dir = "<project_dir>"
+
+# venv: string | null
+# Virtual environment to use when importing settings. Possible values: 'auto'
+# (auto-detect from ./venv, ./.venv, uv, or poetry), 'uv' (use uv-managed venv),
+# 'poetry' (use Poetry-managed venv), a path to the venv directory (relative paths
+# are resolved from project_dir), or null/empty string to disable.
+# Default: "auto"
+# Examples: "auto", "poetry", "uv", "./.venv", "/path/to/.venv"
+# venv = "auto"
 
 # respect_exclude: boolean
 # Respect the exclude attribute in the fields.

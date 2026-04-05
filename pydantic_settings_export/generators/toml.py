@@ -1,15 +1,13 @@
 """TOML generator for Pydantic settings export."""
 
-import json
 import re
 import textwrap
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field
 
-from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel
+from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, format_types, value_repr
 
 from .abstract import AbstractGenerator, BaseGeneratorSettings
 
@@ -34,52 +32,10 @@ TOML_MODE_MAP: dict[TomlMode, tuple[bool, bool]] = {
 TOML_MODE_MAP_DEFAULT = TOML_MODE_MAP["all"]
 
 
-def default_header_formatter(name: str, docstring: str) -> str:
-    """Format header with name and docstring.
-
-    Args:
-        name: The name of the settings class or section
-        docstring: The documentation string
-
-    Returns:
-        Formatted header with name on first line, then wrapped docstring
-    """
-    lines = []
-    if name:
-        lines.append(name)
-    if docstring:
-        wrapped = textwrap.fill(docstring, width=80, break_long_words=False, break_on_hyphens=False)
-        lines.append(wrapped)
-    return "\n".join(lines)
-
-
-def default_type_formatter(key_name: str, types: list[str], required: bool, deprecated: bool) -> str:
-    """Format field type information."""
-    type_str = " | ".join(types)
-    required_marker = " (REQUIRED)" if required else ""
-    deprecated_marker = " (DEPRECATED)" if deprecated else ""
-    return f"{key_name}: {type_str}{required_marker}{deprecated_marker}"
-
-
-def default_description_formatter(description: str) -> str:
-    """Format field description with wrapping at 80 columns."""
-    return textwrap.fill(description, width=80, break_long_words=False, break_on_hyphens=False)
-
-
-def default_default_formatter(default: str) -> str:
-    """Format default value with 'Default: ' prefix."""
-    return f"Default: {default}"
-
-
-def default_examples_formatter(examples: list[str]) -> str:
-    """Format examples with 'Examples: ' prefix."""
-    return f"Examples: {', '.join(examples)}"
-
-
 class TomlSettings(BaseGeneratorSettings):
     """Settings for the TOML file generator."""
 
-    model_config = ConfigDict(title="Generator: TOML Configuration File Settings", arbitrary_types_allowed=True)
+    model_config = ConfigDict(title="Generator: TOML Configuration File Settings")
 
     paths: list[Path] = Field(
         default_factory=list,
@@ -91,45 +47,29 @@ class TomlSettings(BaseGeneratorSettings):
         ],
     )
 
-    header_formatter: Callable[[str, str], str] | None = Field(
-        default_header_formatter,
-        description=(
-            "Formatter for header with name and docstring. If None, header is not included. "
-            "Takes name and docstring as parameters."
-        ),
-        exclude=True,
+    show_header: bool = Field(
+        True,
+        description="Show a header comment with the settings class name and docstring.",
     )
 
-    type_formatter: Callable[[str, list[str], bool, bool], str] | None = Field(
-        default_type_formatter,
-        description=(
-            "Formatter for field type information. If None, types are not included. "
-            "Takes key_name, types, required, deprecated as parameters."
-        ),
-        exclude=True,
+    show_types: bool = Field(
+        True,
+        description="Show a type annotation comment for each field.",
     )
 
-    description_formatter: Callable[[str], str] | None = Field(
-        default_description_formatter,
-        description="Formatter for field descriptions. If None, descriptions are not included.",
-        exclude=True,
+    show_description: bool = Field(
+        True,
+        description="Show a description comment for each field.",
     )
 
-    default_formatter: Callable[[str], str] | None = Field(
-        default_default_formatter,
-        description=(
-            "Formatter for default values. If None, defaults are not included. "
-            "Takes the default value as string parameter."
-        ),
-        exclude=True,
+    show_default: bool = Field(
+        True,
+        description="Show a default-value comment for each field.",
     )
 
-    examples_formatter: Callable[[list[str]], str] | None = Field(
-        default_examples_formatter,
-        description=(
-            "Formatter for examples. If None, examples are not included. Takes the list of examples as parameter."
-        ),
-        exclude=True,
+    show_examples: bool = Field(
+        True,
+        description="Show an examples comment for each field.",
     )
 
     comment_defaults: bool = Field(
@@ -204,21 +144,88 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
         - It has a None default (always commented regardless of comment_defaults)
         - It is required (always commented to force user to provide a value)
         - comment_defaults is True and the field has a default value
+        - BUT NOT if we have an actual value from an instance
         """
-        if field.default == "null":
-            return True
+        if field.has_value:
+            return False
 
         if field.is_required:
             return True
 
+        if field.default is None:
+            return True
+
         return self.generator_config.comment_defaults
+
+    def _format_header_comment(self, name: str, docstring: str) -> str:
+        """Format the header comment lines for a settings class or section.
+
+        Override this method in a subclass to customise header formatting.
+
+        :param name: The settings class or section name.
+        :param docstring: The docstring associated with the class or section.
+        :return: Multi-line string to emit as successive TOML comments.
+        """
+        lines = []
+        if name:
+            lines.append(name)
+        if docstring:
+            wrapped = textwrap.fill(docstring, width=80, break_long_words=False, break_on_hyphens=False)
+            lines.append(wrapped)
+        return "\n".join(lines)
+
+    def _format_type_comment(self, key_name: str, types: list[Any], required: bool, deprecated: bool) -> str:
+        """Format the type-annotation comment line for a field.
+
+        Override this method in a subclass to customise type formatting.
+
+        :param key_name: The display name (TOML key) for the field.
+        :param types: The raw types list from :class:`~pydantic_settings_export.models.FieldInfoModel`.
+        :param required: Whether the field is required.
+        :param deprecated: Whether the field is deprecated.
+        :return: Single comment line string.
+        """
+        type_str = " | ".join(format_types(types))
+        required_marker = " (REQUIRED)" if required else ""
+        deprecated_marker = " (DEPRECATED)" if deprecated else ""
+        return f"{key_name}: {type_str}{required_marker}{deprecated_marker}"
+
+    def _format_description_comment(self, description: str) -> str:
+        """Format the description comment for a field.
+
+        Override this method in a subclass to customise description formatting.
+
+        :param description: The raw description string.
+        :return: Formatted (possibly multi-line) string.
+        """
+        return textwrap.fill(description, width=80, break_long_words=False, break_on_hyphens=False)
+
+    def _format_default_comment(self, default: Any) -> str:
+        """Format the default-value comment line for a field.
+
+        Override this method in a subclass to customise default formatting.
+
+        :param default: The raw Python default value.
+        :return: Single comment line string.
+        """
+        return f"Default: {value_repr(default)}"
+
+    def _format_examples_comment(self, examples: list[Any]) -> str:
+        """Format the examples comment line for a field.
+
+        Override this method in a subclass to customise examples formatting.
+
+        :param examples: The list of raw Python example values.
+        :return: Single comment line string.
+        """
+        return f"Examples: {', '.join(value_repr(e) for e in examples)}"
 
     def _add_header_comments(self, container: Any, name: str, docstring: str) -> None:
         """Add header comments to a container."""
-        if not self.generator_config.header_formatter:
+        if not self.generator_config.show_header:
             return
 
-        formatted = self.generator_config.header_formatter(name, docstring)
+        formatted = self._format_header_comment(name, docstring)
         if formatted:
             for line in formatted.split("\n"):
                 container.add(comment(line))
@@ -228,23 +235,21 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
         """Generate comment lines for a field."""
         lines: list[str] = []
 
-        if self.generator_config.type_formatter:
+        if self.generator_config.show_types:
             display_name = key_name if key_name else field.name
-            type_line = self.generator_config.type_formatter(
-                display_name, field.types, field.is_required, field.deprecated
-            )
+            type_line = self._format_type_comment(display_name, field.types, field.is_required, field.deprecated)
             lines.append(type_line)
 
-        if self.generator_config.description_formatter and field.description:
-            formatted_desc = self.generator_config.description_formatter(field.description)
+        if self.generator_config.show_description and field.description:
+            formatted_desc = self._format_description_comment(field.description)
             lines.extend(formatted_desc.split("\n"))
 
-        if self.generator_config.default_formatter and field.default and not field.is_required:
-            default_line = self.generator_config.default_formatter(field.default)
+        if self.generator_config.show_default and not field.is_required:
+            default_line = self._format_default_comment(field.default)
             lines.append(default_line)
 
-        if self.generator_config.examples_formatter and field.has_examples():
-            examples_line = self.generator_config.examples_formatter(field.examples)
+        if self.generator_config.show_examples and field.has_examples():
+            examples_line = self._format_examples_comment(field.examples)
             lines.append(examples_line)
 
         return lines
@@ -259,7 +264,7 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             container.add(comment(line))
 
         if not self._should_comment_field(field):
-            value = json.loads(cast(str, field.default))
+            value = field.value if field.has_value else field.default
             if prefix:
                 key_parts = full_key.split(".")
                 toml_key = key(key_parts)
@@ -267,11 +272,11 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             else:
                 container[full_key] = value
 
-        elif field.is_required or field.default == "null":
+        elif field.is_required or field.default is None:
             container.add(comment(f"{full_key} ="))
 
         else:
-            value = json.loads(cast(str, field.default))
+            value = field.default
             value_str = tomlkit.dumps({field_key: value}).strip()
             if prefix:
                 value_str = value_str.replace(f"{field_key} =", f"{full_key} =", 1)
@@ -284,6 +289,8 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
         self._add_header_comments(container, child.name, child.docs)
 
         for field in child.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             if self._should_include_field(field):
                 self._add_field_to_container(container, field, prefix=dotted_prefix)
 
@@ -296,6 +303,8 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
     ) -> None:
         """Add settings (fields + child settings) to a container (doc or section)."""
         for field in settings.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             if self._should_include_field(field):
                 self._add_field_to_container(container, field)
 
@@ -358,4 +367,6 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             self._add_settings_to_container(doc, settings_info, current_depth=0)
 
         result = tomlkit.dumps(doc)
-        return re.sub(r"#\s+$", "#", result, flags=re.MULTILINE)
+
+        result = re.sub(r"#\s+$", "#", result, flags=re.MULTILINE)
+        return result

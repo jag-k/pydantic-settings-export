@@ -1,8 +1,11 @@
 import argparse
 import importlib
+import logging
 import re
 import sys
 from collections.abc import Sequence
+from inspect import isclass
+from types import ModuleType
 from typing import Any
 
 from pydantic import ImportString, TypeAdapter
@@ -15,6 +18,8 @@ __all__ = (
     "make_pretty_md_table",
     "make_pretty_md_table_from_dict",
 )
+
+logger = logging.getLogger(__name__)
 
 MARKDOWN_PIPE_RE = re.compile(r"(?<!\\)\|")
 
@@ -179,9 +184,47 @@ class MissingSettingsError(ValueError):
         )
 
 
-def import_settings_from_string(value: str) -> BaseSettings:
-    """Import the settings from the string."""
-    obj: BaseSettings
+def _find_settings_in_module(module: ModuleType) -> list[type[BaseSettings]]:
+    """Discover all BaseSettings subclasses defined in a module.
+
+    Only classes whose ``__module__`` matches the module's ``__name__`` are
+    returned, so re-imported classes from other modules are excluded.
+
+    :param module: The imported module to inspect.
+    :return: List of BaseSettings subclasses defined in the module.
+    """
+    module_name = module.__name__
+    return [
+        obj
+        for obj in vars(module).values()
+        if (
+            isclass(obj)  # If it's a class
+            and issubclass(obj, BaseSettings)  # and it's a subclass of BaseSettings
+            and obj is not BaseSettings  # and it's not BaseSettings itself
+            and obj.__module__ == module_name  # and it's defined in this module
+        )
+    ]
+
+
+def import_settings_from_string(value: str) -> list[BaseSettings | type[BaseSettings]]:
+    """Import the settings from the string.
+
+    When *value* contains ``:``, the part before it is treated as a module
+    path and the part after it as an attribute name (e.g.
+    ``"app.settings:Settings"``).  The resolved object must be a
+    :class:`~pydantic_settings.BaseSettings` subclass or instance.
+
+    When *value* contains no ``:``, it is treated as a plain Python module
+    path (e.g. ``"app.settings"``).  In this case the module is imported and
+    **all** :class:`~pydantic_settings.BaseSettings` subclasses defined in
+    that module (i.e. whose ``__module__`` equals the module name) are
+    returned.
+
+    :param value: Import string in ``"module:attribute"`` or
+        ``"module"`` format.
+    :return: List of resolved settings classes or instances.
+    """
+    obj: Any
     try:
         obj = TypeAdapter(ImportString).validate_python(value)
     except ValidationError as err:
@@ -193,6 +236,12 @@ def import_settings_from_string(value: str) -> BaseSettings:
             raise MissingSettingsError(missing=missing, settings_path=value) from err
         raise err from None
 
-    if isinstance(obj, type) and not issubclass(obj, BaseSettings) and not isinstance(obj, BaseSettings):
-        raise ValueError(f"The {obj!r} is not a settings class.")
-    return obj
+    if isinstance(obj, ModuleType):
+        found = _find_settings_in_module(obj)
+        if not found:
+            logger.warning("No BaseSettings subclasses found in module %r", value)
+        return found  # type: ignore[return-value]
+
+    if (isinstance(obj, type) and issubclass(obj, BaseSettings)) or isinstance(obj, BaseSettings):
+        return [obj]
+    raise ValueError(f"The {obj!r} is not a settings class.")

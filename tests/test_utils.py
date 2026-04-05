@@ -1,10 +1,15 @@
 """Tests for utils module."""
 
+import sys
+import types
+
 import pytest
 
 from pydantic_settings_export.utils import (
     MissingSettingsError,
     ObjectImportAction,
+    _find_settings_in_module,
+    import_settings_from_string,
     make_pretty_md_table,
     make_pretty_md_table_from_dict,
 )
@@ -261,3 +266,112 @@ def test_q_function_with_special_chars() -> None:
     result = q("test|value")
 
     assert result == "`test|value`"
+
+
+# =============================================================================
+# Tests for _find_settings_in_module
+# =============================================================================
+
+
+def _make_module_with_settings(name: str) -> types.ModuleType:
+    """Create a throwaway module containing two BaseSettings subclasses."""
+    from pydantic_settings import BaseSettings
+
+    module = types.ModuleType(name)
+    module.__name__ = name
+
+    class LocalSettings(BaseSettings):
+        pass
+
+    class AnotherSettings(BaseSettings):
+        pass
+
+    LocalSettings.__module__ = name
+    AnotherSettings.__module__ = name
+
+    module.LocalSettings = LocalSettings  # type: ignore[attr-defined]
+    module.AnotherSettings = AnotherSettings  # type: ignore[attr-defined]
+    return module
+
+
+def test_find_settings_in_module_discovers_subclasses() -> None:
+    """BaseSettings subclasses defined in the module are discovered."""
+    module = _make_module_with_settings("_test_find_settings_mod")
+    result = _find_settings_in_module(module)
+    assert len(result) == 2
+    assert all(issubclass(cls, __import__("pydantic_settings").BaseSettings) for cls in result)
+
+
+def test_find_settings_in_module_excludes_reimported() -> None:
+    """Classes whose __module__ differs from the module name are excluded."""
+    from pydantic_settings import BaseSettings
+
+    module = types.ModuleType("_test_find_reimport_mod")
+    module.__name__ = "_test_find_reimport_mod"
+    module.BaseSettings = BaseSettings  # type: ignore[attr-defined]
+
+    result = _find_settings_in_module(module)
+    assert result == []
+
+
+def test_find_settings_in_module_excludes_base_settings_itself() -> None:
+    """BaseSettings itself is never returned."""
+    from unittest.mock import patch
+
+    from pydantic_settings import BaseSettings
+
+    module = types.ModuleType("_test_base_mod")
+    module.__name__ = "_test_base_mod"
+    module.BaseSettings = BaseSettings  # type: ignore[attr-defined]
+
+    with patch.object(BaseSettings, "__module__", "_test_base_mod"):
+        result = _find_settings_in_module(module)
+
+    assert BaseSettings not in result
+
+
+# =============================================================================
+# Tests for import_settings_from_string
+# =============================================================================
+
+
+def test_import_settings_from_string_specific_class() -> None:
+    """'module:Class' format returns a single-element list with that class."""
+    from pydantic_settings_export.settings import PSESettings
+
+    result = import_settings_from_string("pydantic_settings_export.settings:PSESettings")
+    assert result == [PSESettings]
+
+
+def test_import_settings_from_string_module_discovers_subclasses() -> None:
+    """Module-only path discovers all BaseSettings subclasses defined there."""
+    from pydantic_settings_export.settings import PSESettings
+
+    result = import_settings_from_string("pydantic_settings_export.settings")
+    assert PSESettings in result
+
+
+def test_import_settings_from_string_module_excludes_reimported() -> None:
+    """Re-imported BaseSettings subclasses are not included in module discovery."""
+    from pydantic_settings_export.sources import TomlSettings
+
+    result = import_settings_from_string("pydantic_settings_export.settings")
+    assert TomlSettings not in result
+
+
+def test_import_settings_from_string_empty_module_returns_empty() -> None:
+    """Module with no BaseSettings subclasses returns an empty list."""
+    mod_name = "_test_empty_settings_module"
+    module = types.ModuleType(mod_name)
+    sys.modules[mod_name] = module
+    try:
+        result = import_settings_from_string(mod_name)
+        assert result == []
+    finally:
+        del sys.modules[mod_name]
+
+
+def test_import_settings_from_string_not_settings_class_raises() -> None:
+    """Non-BaseSettings object imported via 'module:attr' raises ValueError."""
+    with pytest.raises(ValueError, match="is not a settings class"):
+        import_settings_from_string("pydantic_settings_export.utils:make_pretty_md_table")

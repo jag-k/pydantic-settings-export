@@ -171,7 +171,7 @@ def test_dotenv_nested_with_env_prefix() -> None:
         host: str = Field(default="localhost")
 
     class Settings(BaseSettings):
-        model_config = SettingsConfigDict(env_prefix="APP_")
+        model_config = SettingsConfigDict(env_prefix="APP_", env_nested_delimiter="_")
         database: Database = Field(default_factory=Database)
 
     generator = DotEnvGenerator(generator_config=DotEnvSettings(split_by_group=False))

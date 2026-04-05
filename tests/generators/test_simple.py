@@ -24,8 +24,8 @@ Settings
 
 Environment Prefix: APP_
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 
 A field
 
@@ -58,8 +58,8 @@ Settings
 
 Test settings.
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 
 Field description
 
@@ -94,8 +94,8 @@ def test_simple_with_deprecated() -> None:
 Settings
 ========
 
-`field` (⚠️ Deprecated): ['string']
------------------------------------
+`field` (⚠️ Deprecated): string
+-------------------------------
 Default: "value"
 """
 
@@ -115,8 +115,8 @@ def test_simple_with_examples() -> None:
 Settings
 ========
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 Default: "default"
 Examples: "ex1", "ex2"
 """
@@ -147,8 +147,8 @@ Settings
 
 Test settings.
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 
 Field description
 
@@ -171,8 +171,8 @@ def test_simple_without_description() -> None:
 Settings
 ========
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 Default: "value"
 """
     assert result == expected
@@ -199,20 +199,20 @@ def test_simple_with_various_types() -> None:
 Settings
 ========
 
-`str_field`: ['string']
------------------------
+`str_field`: string
+-------------------
 Default: "value"
 
-`int_field`: ['integer']
-------------------------
+`int_field`: integer
+--------------------
 Default: 42
 
-`bool_field`: ['boolean']
--------------------------
+`bool_field`: boolean
+---------------------
 Default: true
 
-`list_field`: ['array']
------------------------
+`list_field`: array
+-------------------
 Default: []
 """
     assert result == expected
@@ -236,8 +236,8 @@ def test_simple_with_alias() -> None:
 Settings
 ========
 
-`external_name`: ['string']
----------------------------
+`external_name`: string
+-----------------------
 Default: "value"
 """
     assert result == expected
@@ -259,8 +259,8 @@ Settings
 
 Test settings.
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 
 Field description
 
@@ -283,8 +283,8 @@ def test_simple_without_docstring() -> None:
 Settings
 ========
 
-`field`: ['string']
--------------------
+`field`: string
+---------------
 Default: "value"
 """
     assert result == expected
@@ -305,15 +305,15 @@ def test_simple_full_settings(full_settings: type[BaseSettings]) -> None:
 Settings
 ========
 
-`log_level`: ['"DEBUG"', '"INFO"', '"WARNING"', '"ERROR"', '"CRITICAL"']
-------------------------------------------------------------------------
+`log_level`: "DEBUG" | "INFO" | "WARNING" | "ERROR" | "CRITICAL"
+----------------------------------------------------------------
 
 The log level to use
 
 Default: "INFO"
 
-`log_format`: ['string']
-------------------------
+`log_format`: string
+--------------------
 
 The log format to use
 
@@ -347,8 +347,8 @@ Settings1
 
 First settings.
 
-`field1`: ['string']
---------------------
+`field1`: string
+----------------
 Default: "value1"
 
 Settings2
@@ -356,8 +356,8 @@ Settings2
 
 Second settings.
 
-`field2`: ['string']
---------------------
+`field2`: string
+----------------
 Default: "value2"
 """
     assert result == expected
@@ -378,22 +378,22 @@ def test_simple_multiple_fields() -> None:
 Settings
 ========
 
-`field1`: ['string']
---------------------
+`field1`: string
+----------------
 
 First field
 
 Default: "value1"
 
-`field2`: ['integer']
----------------------
+`field2`: integer
+-----------------
 
 Second field
 
 Default: 42
 
-`field3`: ['boolean']
----------------------
+`field3`: boolean
+-----------------
 
 Third field
 

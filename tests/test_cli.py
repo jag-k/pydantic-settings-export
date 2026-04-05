@@ -59,6 +59,42 @@ def test_parser_default_values() -> None:
     assert args.settings == []
     assert args.env_file == []
     assert args.project_dir is None
+    assert args.venv is None
+
+
+def test_parser_venv_auto() -> None:
+    """Test --venv auto."""
+    parser = make_parser()
+    args = parser.parse_args(["--venv", "auto"])
+    assert args.venv == "auto"
+
+
+def test_parser_venv_uv() -> None:
+    """Test --venv uv."""
+    parser = make_parser()
+    args = parser.parse_args(["--venv", "uv"])
+    assert args.venv == "uv"
+
+
+def test_parser_venv_poetry() -> None:
+    """Test --venv poetry."""
+    parser = make_parser()
+    args = parser.parse_args(["--venv", "poetry"])
+    assert args.venv == "poetry"
+
+
+def test_parser_venv_custom_path() -> None:
+    """Test --venv with custom path."""
+    parser = make_parser()
+    args = parser.parse_args(["--venv", "/some/path/.venv"])
+    assert args.venv == "/some/path/.venv"
+
+
+def test_parser_venv_empty_disables() -> None:
+    """Test --venv '' disables venv detection."""
+    parser = make_parser()
+    args = parser.parse_args(["--venv", ""])
+    assert args.venv == ""
 
 
 def test_parser_with_settings() -> None:

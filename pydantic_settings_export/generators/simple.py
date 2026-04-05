@@ -1,6 +1,6 @@
 from pydantic import ConfigDict
 
-from pydantic_settings_export.models import SettingsInfoModel
+from pydantic_settings_export.models import SettingsInfoModel, format_types, value_repr
 
 from .abstract import AbstractGenerator, BaseGeneratorSettings
 
@@ -52,20 +52,22 @@ class SimpleGenerator(AbstractGenerator[SimpleSettings]):
             result += f"\n{indent}{docs}\n"
 
         for field in settings_info.fields:
+            if field.is_env_only:
+                continue  # synthetic JSON fields are for env generators only
             field_name = f"`{field.full_name}`"
             if field.deprecated:
                 field_name += " (⚠️ Deprecated)"
 
-            h = f"{field_name}: {field.types}"
+            h = f"{field_name}: {' | '.join(format_types(field.types))}"
             result += f"\n{h}\n{'-' * len(h)}\n"
 
             if field.description:
                 result += f"\n{field.description}\n\n"
 
-            if field.default:
-                result += f"Default: {field.default}\n"
+            if not field.is_required:
+                result += f"Default: {value_repr(field.default)}\n"
 
             if field.has_examples():
-                result += f"Examples: {', '.join(field.examples)}\n"
+                result += f"Examples: {', '.join(value_repr(e) for e in field.examples)}\n"
 
         return result
