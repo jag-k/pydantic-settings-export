@@ -297,11 +297,8 @@ class FieldInfoModel(BaseModel):
         None,
         description="The default value of the field as a raw Python object. Only meaningful when is_required=False.",
     )
-    has_value: bool = Field(
-        False, description="True when an instance value that differs from the default is available."
-    )
     value: Any = Field(
-        None,
+        PydanticUndefined,
         description="The actual value from an instance as a raw Python object. Only meaningful when has_value=True.",
     )
     description: str | None = Field(None, description="The description of the field.")
@@ -315,6 +312,11 @@ class FieldInfoModel(BaseModel):
         description="True for synthetic JSON fields representing a non-env-expandable nested model. "
         "Structural generators (TOML, simple) skip these.",
     )
+
+    @property
+    def has_value(self) -> bool:
+        """True when an instance value that differs from the default is available."""
+        return self.value is not PydanticUndefined and self.value != self.default
 
     @property
     def full_name(self) -> str:
@@ -419,9 +421,7 @@ class FieldInfoModel(BaseModel):
         raw_default = cls.create_default(field, global_settings)
         is_required = raw_default is PydanticUndefined
         default: Any = None if is_required else raw_default
-        raw_value = cls.create_value(instance, name, global_settings) if instance else PydanticUndefined
-        _has_value = raw_value is not PydanticUndefined and raw_value != default
-        value: Any = None if raw_value is PydanticUndefined else raw_value
+        value = cls.create_value(instance, name, global_settings) if instance else PydanticUndefined
         # Get the description from the field if it exists
         description: str | None = field.description or None
         # Get the example from the field if it exists
@@ -453,7 +453,6 @@ class FieldInfoModel(BaseModel):
             types=types,
             is_required=is_required,
             default=default,
-            has_value=_has_value,
             value=value,
             description=description,
             examples=examples,

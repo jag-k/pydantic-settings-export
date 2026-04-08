@@ -144,11 +144,7 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
         - It has a None default (always commented regardless of comment_defaults)
         - It is required (always commented to force user to provide a value)
         - comment_defaults is True and the field has a default value
-        - BUT NOT if we have an actual value from an instance
         """
-        if field.has_value:
-            return False
-
         if field.is_required:
             return True
 
@@ -264,7 +260,7 @@ class TomlGenerator(AbstractGenerator[TomlSettings]):
             container.add(comment(line))
 
         if not self._should_comment_field(field):
-            value = field.value if field.has_value else field.default
+            value = field.default
             if prefix:
                 key_parts = full_key.split(".")
                 toml_key = key(key_parts)

@@ -15,8 +15,12 @@ class SimpleSettings(BaseSettings):
     debug: bool = Field(default=False, description="Debug mode")
 
 
-def test_dotenv_instance_shows_default_commented_and_value_uncommented() -> None:
-    """Instance should show default commented and value uncommented."""
+def test_dotenv_instance_always_uses_defaults() -> None:
+    """Instance values must NOT appear in .env.example — only defaults/examples.
+
+    .env.example is a template. Values populated from a loaded .env file (or any
+    other env source) must not leak into the generated output.
+    """
     instance = SimpleSettings(host="production.example.com", port=443, debug=True)
     info = SettingsInfoModel.from_settings_model(instance)
 
@@ -26,12 +30,9 @@ def test_dotenv_instance_shows_default_commented_and_value_uncommented() -> None
     expected = """\
 ### SimpleSettings
 
-# HOST="localhost"  # default
-HOST="production.example.com"
-# PORT=8080  # default
-PORT=443
-# DEBUG=false  # default
-DEBUG=true
+# HOST="localhost"
+# PORT=8080
+# DEBUG=false
 """
     assert result == expected
 
@@ -49,8 +50,8 @@ def test_dotenv_instance_same_as_default_behaves_like_class() -> None:
     assert result_instance == result_class
 
 
-def test_dotenv_nested_instance() -> None:
-    """Nested instances should propagate their values."""
+def test_dotenv_nested_instance_uses_defaults() -> None:
+    """Nested instances should also use defaults, not instance values."""
 
     class Database(BaseSettings):
         host: str = Field(default="localhost", description="DB host")
@@ -71,14 +72,11 @@ def test_dotenv_nested_instance() -> None:
     expected = """\
 ### AppSettings
 
-# DEBUG=false  # default
-DEBUG=true
+# DEBUG=false
 
 ### Database
 
-# DATABASE_HOST="localhost"  # default
-DATABASE_HOST="prod-db.example.com"
-# DATABASE_PORT=5432  # default
-DATABASE_PORT=5433
+# DATABASE_HOST="localhost"
+# DATABASE_PORT=5432
 """
     assert result == expected
