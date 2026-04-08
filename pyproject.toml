@@ -43,6 +43,7 @@ dependencies = [
 
 [project.scripts]
 pydantic-settings-export = "pydantic_settings_export.cli:main"
+pse = "pydantic_settings_export.cli:main"
 
 [project.optional-dependencies]
 all = [
