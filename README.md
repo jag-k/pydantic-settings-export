@@ -105,6 +105,8 @@ pip install "pydantic-settings-export[toml]"  # Install with toml extra
     pydantic-settings-export app.settings
     ```
 
+    > **Tip:** `pse` is a shorter alias for `pydantic-settings-export` and can be used interchangeably.
+
 For more detailed usage, see our [Getting Started Guide][gh-wiki/getting-started].
 
 > Note: The package follows [SemVer](https://semver.org).
@@ -131,7 +133,8 @@ The recommended way to use this package is through its CLI or as a [pre-commit] 
 
 ### CLI Usage
 
-The CLI provides a powerful interface for generating documentation:
+The CLI provides a powerful interface for generating documentation.
+The tool is available as `pydantic-settings-export` (or the shorter alias `pse`).
 
 ```bash
 # Basic usage
