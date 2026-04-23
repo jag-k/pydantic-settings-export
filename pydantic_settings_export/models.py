@@ -285,9 +285,9 @@ def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     return default
 
 
-def settings_source(settings: BaseSettings | type[BaseSettings], global_settings: PSESettings | None = None) -> str:
+def settings_source(settings: BaseModel | type[BaseModel], global_settings: PSESettings | None = None) -> str:
     """Build a stable human-readable source reference for a settings class."""
-    settings_class: type[BaseSettings] = settings.__class__ if isinstance(settings, BaseSettings) else settings
+    settings_class = cast(type[BaseModel], settings if isclass(settings) else settings.__class__)
 
     try:
         source_path = Path(getfile(settings_class)).resolve().absolute()
@@ -510,7 +510,7 @@ class SettingsInfoModel(BaseModel):
     @classmethod
     def from_settings_model(  # noqa: C901
         cls,
-        settings: BaseSettings | type[BaseSettings],
+        settings: BaseModel | type[BaseModel],
         global_settings: PSESettings | None = None,
         prefix: str = "",
         nested_delimiter: str | None = None,
@@ -529,7 +529,7 @@ class SettingsInfoModel(BaseModel):
         :param env_accessible: Propagated to child fields; False → env_names=[]. Used by env generators.
         :return: Instance of SettingsInfoModel.
         """
-        if isinstance(settings, BaseSettings):
+        if isinstance(settings, BaseModel):
             instance = settings
             settings_class = settings.__class__
         else:

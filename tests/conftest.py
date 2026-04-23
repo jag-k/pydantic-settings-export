@@ -7,6 +7,11 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, MongoDsn, SecretS
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _relative_source(path: Path, root: Path) -> str:
+    """Return a TOML-safe relative source path."""
+    return path.relative_to(root).as_posix()
+
+
 @dataclass
 class SettingsSourcesProject:
     """Temporary project tree with real settings modules for import tests."""
@@ -28,42 +33,42 @@ class SettingsSourcesProject:
     @property
     def module_file_source(self) -> str:
         """Path to the main settings file relative to the project root."""
-        return f"./{self.module_file.relative_to(self.root)!s}"
+        return _relative_source(self.module_file, self.root)
 
     @property
     def discovered_dir_source(self) -> str:
         """Path to the recursive discovery directory relative to the project root."""
-        return f"./{self.discovered_dir.relative_to(self.root)!s}"
+        return _relative_source(self.discovered_dir, self.root)
 
     @property
     def standalone_file_source(self) -> str:
         """Path to the standalone settings file relative to the project root."""
-        return f"./{self.standalone_file.relative_to(self.root)!s}"
+        return _relative_source(self.standalone_file, self.root)
 
     @property
     def problematic_dir_source(self) -> str:
         """Path to the directory with partial import failures."""
-        return f"./{self.problematic_dir.relative_to(self.root)!s}"
+        return _relative_source(self.problematic_dir, self.root)
 
     @property
     def no_settings_file_source(self) -> str:
         """Path to the file without settings relative to the project root."""
-        return f"./{self.no_settings_file.relative_to(self.root)!s}"
+        return _relative_source(self.no_settings_file, self.root)
 
     @property
     def broken_syntax_source(self) -> str:
         """Path to the file with a syntax error relative to the project root."""
-        return f"./{self.broken_syntax_file.relative_to(self.root)!s}"
+        return _relative_source(self.broken_syntax_file, self.root)
 
     @property
     def broken_import_source(self) -> str:
         """Path to the file with an import error relative to the project root."""
-        return f"./{self.broken_import_file.relative_to(self.root)!s}"
+        return _relative_source(self.broken_import_file, self.root)
 
     @property
     def text_file_source(self) -> str:
         """Path to the non-Python file relative to the project root."""
-        return f"./{self.text_file.relative_to(self.root)!s}"
+        return _relative_source(self.text_file, self.root)
 
 
 @dataclass
@@ -318,16 +323,16 @@ def colliding_settings_project(tmp_path: Path) -> CollidingSettingsProject:
         root=tmp_path,
         sources={
             "same_impl": [
-                f"./{(same_dir / 'first.py').relative_to(tmp_path)!s}",
-                f"./{(same_dir / 'second.py').relative_to(tmp_path)!s}",
+                _relative_source(same_dir / "first.py", tmp_path),
+                _relative_source(same_dir / "second.py", tmp_path),
             ],
             "different_defaults": [
-                f"./{(defaults_dir / 'first.py').relative_to(tmp_path)!s}",
-                f"./{(defaults_dir / 'second.py').relative_to(tmp_path)!s}",
+                _relative_source(defaults_dir / "first.py", tmp_path),
+                _relative_source(defaults_dir / "second.py", tmp_path),
             ],
             "different_shape": [
-                f"./{(shape_dir / 'first.py').relative_to(tmp_path)!s}",
-                f"./{(shape_dir / 'second.py').relative_to(tmp_path)!s}",
+                _relative_source(shape_dir / "first.py", tmp_path),
+                _relative_source(shape_dir / "second.py", tmp_path),
             ],
         },
     )

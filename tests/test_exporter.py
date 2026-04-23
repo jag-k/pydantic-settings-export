@@ -40,9 +40,11 @@ def test_exporter_init_with_settings(pse_settings: PSESettings) -> None:
 
 def test_exporter_init_default_generators() -> None:
     """Test Exporter initializes all built-in generators it can construct."""
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
         exporter = Exporter()
+
+    assert not records, [str(record.message) for record in records]
 
     # All initialized generators should be registered built-ins
     generator_types = [type(g) for g in exporter.generators]
@@ -389,7 +391,10 @@ def test_generator_settings_mixed_old_and_new_sources_are_deduplicated(settings_
 
     assert output_file in result
     content = output_file.read_text()
-    assert content.count("AppSettings\n") == 1
+    app_settings_sections = [
+        line for line in content.splitlines() if line == "AppSettings" or line.startswith("AppSettings [")
+    ]
+    assert app_settings_sections == ["AppSettings"]
     assert "StandaloneSettings" in content
 
 

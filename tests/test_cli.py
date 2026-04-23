@@ -311,7 +311,7 @@ def test_main_cli_settings_replaces_default_settings(tmp_path: Path) -> None:
     config_file.write_text(
         "[tool.pydantic_settings_export]\n\n"
         "[[tool.pydantic_settings_export.generators.simple]]\n"
-        f'paths = ["{output_file!s}"]\n'
+        f'paths = ["{output_file.as_posix()}"]\n'
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -355,7 +355,7 @@ def test_main_supports_mixed_old_and_new_sources_from_config(settings_sources_pr
         f'    "{settings_sources_project.discovered_dir_source}",\n'
         "]\n\n"
         "[[tool.pydantic_settings_export.generators.simple]]\n"
-        f'paths = ["{output_file!s}"]\n'
+        f'paths = ["{output_file.as_posix()}"]\n'
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -386,7 +386,7 @@ def test_main_positional_sources_replace_config_default_settings(settings_source
         "[tool.pydantic_settings_export]\n"
         f'default_settings = ["{settings_sources_project.standalone_file_source}"]\n\n'
         "[[tool.pydantic_settings_export.generators.simple]]\n"
-        f'paths = ["{output_file!s}"]\n'
+        f'paths = ["{output_file.as_posix()}"]\n'
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -419,7 +419,7 @@ def test_main_invalid_settings_path_exits_with_code_2(settings_sources_project) 
     config_file.write_text(
         "[tool.pydantic_settings_export]\n\n"
         "[[tool.pydantic_settings_export.generators.simple]]\n"
-        f'paths = ["{output_file!s}"]\n'
+        f'paths = ["{output_file.as_posix()}"]\n'
     )
 
     with pytest.raises(SystemExit) as exc_info:

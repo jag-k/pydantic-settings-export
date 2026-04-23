@@ -218,19 +218,20 @@ def _is_path_like(value: str) -> bool:
 
 def _resolve_settings_path(value: str, project_dir: Path | None = None) -> Path | None:
     """Resolve a settings path relative to *project_dir* when applicable."""
-    if not _is_path_like(value):
-        return None
-
     path = Path(value).expanduser()
     if not path.is_absolute():
         path = (project_dir or Path.cwd()) / path
     path = path.resolve().absolute()
 
-    if not path.exists():
-        raise FileNotFoundError(f"The path {value!r} does not exist.")
-    if path.is_file() and path.suffix != ".py":
-        raise ValueError(f"The {value!r} is not a Python file.")
-    return path
+    if path.exists():
+        if path.is_file() and path.suffix != ".py":
+            raise ValueError(f"The {value!r} is not a Python file.")
+        return path
+
+    if not _is_path_like(value):
+        return None
+
+    raise FileNotFoundError(f"The path {value!r} does not exist.")
 
 
 @contextmanager
@@ -285,7 +286,16 @@ def _import_module_from_file(path: Path, project_dir: Path | None = None) -> Mod
     if module_name:
         with _prepend_sys_path(project_dir):
             try:
-                return importlib.import_module(module_name)
+                module = importlib.import_module(module_name)
+                module_file = getattr(module, "__file__", None)
+                if module_file and Path(module_file).resolve().absolute() == path.resolve().absolute():
+                    return module
+                logger.debug(
+                    "Imported module %s from %s instead of %s; falling back to synthetic import",
+                    module_name,
+                    module_file,
+                    path,
+                )
             except Exception:
                 logger.debug("Failed to import %s as %s", path, module_name, exc_info=True)
 
