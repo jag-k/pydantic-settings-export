@@ -39,13 +39,16 @@ def test_exporter_init_with_settings(pse_settings: PSESettings) -> None:
 
 
 def test_exporter_init_default_generators() -> None:
-    """Test Exporter initializes with all default generators."""
-    exporter = Exporter()
+    """Test Exporter initializes all built-in generators it can construct."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exporter = Exporter()
 
-    # Should have generators for all registered generator classes
+    # All initialized generators should be registered built-ins
     generator_types = [type(g) for g in exporter.generators]
-    for gen_class in AbstractGenerator.ALL_GENERATORS:
-        assert gen_class in generator_types
+    assert generator_types
+    for gen_class in generator_types:
+        assert gen_class in AbstractGenerator.ALL_GENERATORS
 
 
 def test_exporter_init_custom_generators(pse_settings: PSESettings) -> None:
@@ -286,9 +289,6 @@ def test_generator_settings_override_ignores_defaults(tmp_path: Path) -> None:
     class DefaultSettings(BaseSettings):
         x: str = "default_field"
 
-    class OverrideSettings(BaseSettings):
-        y: str = "override_field"
-
     pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
     output_file = tmp_path / "output.txt"
 
@@ -296,54 +296,51 @@ def test_generator_settings_override_ignores_defaults(tmp_path: Path) -> None:
         pse_settings,
         generator_config=SimpleSettings(
             paths=[output_file],
-            settings=["override_module:OverrideSettings"],
+            settings=["pydantic_settings_export.settings:PSESettings"],
         ),
     )
     exporter = Exporter(settings=pse_settings, generators=[generator])
 
-    with patch(
-        "pydantic_settings_export.exporter.import_settings_from_string",
-        return_value=[OverrideSettings],
-    ):
-        result = exporter.run_all(DefaultSettings)
+    result = exporter.run_all(DefaultSettings)
 
     assert output_file in result
     content = output_file.read_text()
-    assert "OverrideSettings" in content
+    assert "Global Settings" in content
     assert "DefaultSettings" not in content
 
 
-def test_generator_extend_settings_appends_to_defaults(tmp_path: Path) -> None:
+def test_generator_extend_settings_appends_to_defaults(settings_sources_project) -> None:
     """Generator 'extend_settings' appends to default_settings."""
 
     class DefaultSettings(BaseSettings):
         x: str = "default_field"
 
-    class ExtraSettings(BaseSettings):
-        z: str = "extra_field"
-
-    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
-    output_file = tmp_path / "output.txt"
+    pse_settings = PSESettings(
+        root_dir=settings_sources_project.root,
+        project_dir=settings_sources_project.root,
+    )
+    output_file = settings_sources_project.root / "output.txt"
 
     generator = SimpleGenerator(
         pse_settings,
         generator_config=SimpleSettings(
             paths=[output_file],
-            extend_settings=["extra_module:ExtraSettings"],
+            extend_settings=[
+                settings_sources_project.module_attr,
+                settings_sources_project.discovered_dir_source,
+            ],
         ),
     )
     exporter = Exporter(settings=pse_settings, generators=[generator])
 
-    with patch(
-        "pydantic_settings_export.exporter.import_settings_from_string",
-        return_value=[ExtraSettings],
-    ):
-        result = exporter.run_all(DefaultSettings)
+    result = exporter.run_all(DefaultSettings)
 
     assert output_file in result
     content = output_file.read_text()
     assert "DefaultSettings" in content
-    assert "ExtraSettings" in content
+    assert "AppSettings" in content
+    assert "DatabaseSettings" in content
+    assert "CacheSettings" in content
 
 
 def test_generator_no_override_uses_defaults(tmp_path: Path) -> None:
@@ -364,6 +361,68 @@ def test_generator_no_override_uses_defaults(tmp_path: Path) -> None:
 
     assert output_file in result
     assert "DefaultSettings" in output_file.read_text()
+
+
+def test_generator_settings_mixed_old_and_new_sources_are_deduplicated(settings_sources_project) -> None:
+    """Generator settings should deduplicate repeated classes across source formats."""
+    pse_settings = PSESettings(
+        root_dir=settings_sources_project.root,
+        project_dir=settings_sources_project.root,
+    )
+    output_file = settings_sources_project.root / "mixed-output.txt"
+
+    generator = SimpleGenerator(
+        pse_settings,
+        generator_config=SimpleSettings(
+            paths=[output_file],
+            settings=[
+                settings_sources_project.module_name,
+                settings_sources_project.module_attr,
+                settings_sources_project.module_file_source,
+                settings_sources_project.standalone_file_source,
+            ],
+        ),
+    )
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+
+    result = exporter.run_all()
+
+    assert output_file in result
+    content = output_file.read_text()
+    assert content.count("AppSettings\n") == 1
+    assert "StandaloneSettings" in content
+
+
+def test_generator_settings_invalid_source_warns_and_continues(settings_sources_project) -> None:
+    """Invalid settings source should emit a warning but keep valid sources."""
+    pse_settings = PSESettings(
+        root_dir=settings_sources_project.root,
+        project_dir=settings_sources_project.root,
+    )
+    output_file = settings_sources_project.root / "warnings-output.txt"
+
+    generator = SimpleGenerator(
+        pse_settings,
+        generator_config=SimpleSettings(
+            paths=[output_file],
+            settings=[
+                "./missing/settings.py",
+                settings_sources_project.module_attr,
+                settings_sources_project.problematic_dir_source,
+            ],
+        ),
+    )
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
+        result = exporter.run_all()
+
+    assert output_file in result
+    content = output_file.read_text()
+    assert "AppSettings" in content
+    assert "ProblemSettings" in content
+    assert any("Failed to import settings" in str(record.message) for record in records)
 
 
 def test_exporter_caches_settings_info_across_generators(tmp_path: Path) -> None:

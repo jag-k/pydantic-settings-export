@@ -35,13 +35,17 @@ class PSESettings(TomlSettings):
         description=(
             "The default settings to use. The settings are applied in the order they are listed. "
             "Each entry can be either 'module:attribute' to import a specific class or instance, "
-            "or a plain module path (e.g. 'app.settings') to auto-discover all BaseSettings "
-            "subclasses defined in that module."
+            "a plain module path (e.g. 'app.settings') to auto-discover all BaseSettings "
+            "subclasses defined in that module, a path to a Python file "
+            "(e.g. './app/settings.py'), or a path to a directory "
+            "(e.g. './app/settings') to recursively discover settings in all Python files."
         ),
         examples=[
             ["settings:settings"],
             ["app.config.settings:Settings", "app.config.settings.dev:Settings"],
             ["app.config.settings"],
+            ["./app/settings.py"],
+            ["./app/settings"],
         ],
     )
 

@@ -1,10 +1,15 @@
 import argparse
+import hashlib
 import importlib
+import importlib.util
 import logging
 import re
 import sys
-from collections.abc import Sequence
-from inspect import isclass
+import warnings
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from inspect import getfile, isclass
+from pathlib import Path
 from types import ModuleType
 from typing import Any
 
@@ -184,7 +189,7 @@ class MissingSettingsError(ValueError):
         )
 
 
-def _find_settings_in_module(module: ModuleType) -> list[type[BaseSettings]]:
+def _find_settings_in_module(module: ModuleType) -> list[BaseSettings | type[BaseSettings]]:
     """Discover all BaseSettings subclasses defined in a module.
 
     Only classes whose ``__module__`` matches the module's ``__name__`` are
@@ -206,7 +211,147 @@ def _find_settings_in_module(module: ModuleType) -> list[type[BaseSettings]]:
     ]
 
 
-def import_settings_from_string(value: str) -> list[BaseSettings | type[BaseSettings]]:
+def _is_path_like(value: str) -> bool:
+    """Check if the value looks like a file-system path."""
+    return value.startswith((".", "~", "/")) or value.endswith(".py") or "/" in value or "\\" in value
+
+
+def _resolve_settings_path(value: str, project_dir: Path | None = None) -> Path | None:
+    """Resolve a settings path relative to *project_dir* when applicable."""
+    if not _is_path_like(value):
+        return None
+
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = (project_dir or Path.cwd()) / path
+    path = path.resolve().absolute()
+
+    if not path.exists():
+        raise FileNotFoundError(f"The path {value!r} does not exist.")
+    if path.is_file() and path.suffix != ".py":
+        raise ValueError(f"The {value!r} is not a Python file.")
+    return path
+
+
+@contextmanager
+def _prepend_sys_path(path: Path | None) -> Iterator[None]:
+    """Temporarily prepend a path to ``sys.path``."""
+    if path is None:
+        yield
+        return
+
+    str_path = str(path)
+    sys.path.insert(0, str_path)
+    try:
+        yield
+    finally:
+        try:
+            sys.path.remove(str_path)
+        except ValueError:
+            pass
+
+
+def _make_module_name(path: Path, project_dir: Path | None = None) -> str | None:
+    """Create a module name from the file path relative to *project_dir*."""
+    if project_dir is None:
+        return None
+
+    try:
+        relative_path = path.resolve().relative_to(project_dir.resolve().absolute())
+    except ValueError:
+        return None
+
+    parts = list(relative_path.parts)
+    if not parts:
+        return None
+
+    if path.name == "__init__.py":
+        parts = parts[:-1]
+    elif path.suffix == ".py":
+        parts[-1] = path.stem
+    else:
+        return None
+
+    if not parts:
+        return None
+    return ".".join(parts)
+
+
+def _import_module_from_file(path: Path, project_dir: Path | None = None) -> ModuleType:
+    """Import a module from a Python file path."""
+    importlib.invalidate_caches()
+
+    module_name = _make_module_name(path, project_dir)
+    if module_name:
+        with _prepend_sys_path(project_dir):
+            try:
+                return importlib.import_module(module_name)
+            except Exception:
+                logger.debug("Failed to import %s as %s", path, module_name, exc_info=True)
+
+    synthetic_name = f"_pse_settings_{hashlib.sha256(str(path).encode()).hexdigest()}"
+    spec = importlib.util.spec_from_file_location(synthetic_name, path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Failed to create module spec for {path!s}")
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[synthetic_name] = module
+    try:
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(synthetic_name, None)
+        raise
+    return module
+
+
+def _iter_python_files(path: Path) -> list[Path]:
+    """Get all Python files in the directory recursively."""
+    result = []
+    for file in sorted(path.rglob("*.py")):
+        if any(part == "__pycache__" or part.startswith(".") for part in file.relative_to(path).parts):
+            continue
+        result.append(file)
+    return result
+
+
+def _import_settings_from_path(
+    path: Path,
+    project_dir: Path | None = None,
+) -> list[BaseSettings | type[BaseSettings]]:
+    """Import settings classes from a file or directory path."""
+    if path.is_dir():
+        result: list[BaseSettings | type[BaseSettings]] = []
+        for file in _iter_python_files(path):
+            try:
+                result.extend(_import_settings_from_path(file, project_dir=project_dir))
+            except Exception as e:
+                warnings.warn(f"Failed to import settings from {file!s}: {e}", stacklevel=2)
+        return result
+
+    module = _import_module_from_file(path, project_dir=project_dir)
+    found = _find_settings_in_module(module)
+    if not found:
+        logger.warning("No BaseSettings subclasses found in file %r", str(path))
+    return found
+
+
+def _settings_identity(obj: BaseSettings | type[BaseSettings]) -> tuple[str, ...] | tuple[str, int]:
+    """Create an identity for settings objects to deduplicate them."""
+    if isinstance(obj, BaseSettings) and not isclass(obj):
+        return ("instance", id(obj))
+
+    cls = obj if isclass(obj) else obj.__class__
+    try:
+        file_path = str(Path(getfile(cls)).resolve().absolute())
+    except (OSError, TypeError):
+        file_path = cls.__module__
+    return ("class", file_path, cls.__qualname__)
+
+
+def import_settings_from_string(
+    value: str,
+    project_dir: Path | None = None,
+) -> list[BaseSettings | type[BaseSettings]]:
     """Import the settings from the string.
 
     When *value* contains ``:``, the part before it is treated as a module
@@ -214,27 +359,38 @@ def import_settings_from_string(value: str) -> list[BaseSettings | type[BaseSett
     ``"app.settings:Settings"``).  The resolved object must be a
     :class:`~pydantic_settings.BaseSettings` subclass or instance.
 
-    When *value* contains no ``:``, it is treated as a plain Python module
-    path (e.g. ``"app.settings"``).  In this case the module is imported and
+    When *value* looks like a file-system path, it is resolved relative to
+    *project_dir* (or current working directory), then imported either as a
+    single Python file or as a directory recursively containing Python files.
+
+    When *value* contains no ``:```, it is treated as a plain Python module
+    path (e.g. ``"app.settings"``). In this case the module is imported and
     **all** :class:`~pydantic_settings.BaseSettings` subclasses defined in
     that module (i.e. whose ``__module__`` equals the module name) are
     returned.
 
     :param value: Import string in ``"module:attribute"`` or
-        ``"module"`` format.
+        ``"module"`` format, or a path to a Python file/directory.
+    :param project_dir: Base directory for resolving relative file-system paths.
     :return: List of resolved settings classes or instances.
     """
+    path = _resolve_settings_path(value, project_dir=project_dir)
+    if path is not None:
+        return _import_settings_from_path(path, project_dir=project_dir)
+
     obj: Any
-    try:
-        obj = TypeAdapter(ImportString).validate_python(value)
-    except ValidationError as err:
-        missing: dict[str | int, str] = {}
-        for details in err.errors():
-            if details["type"] == "missing":
-                missing[details["loc"][0]] = details["msg"]
-        if missing:
-            raise MissingSettingsError(missing=missing, settings_path=value) from err
-        raise err from None
+    with _prepend_sys_path(project_dir):
+        importlib.invalidate_caches()
+        try:
+            obj = TypeAdapter(ImportString).validate_python(value)
+        except ValidationError as err:
+            missing: dict[str | int, str] = {}
+            for details in err.errors():
+                if details["type"] == "missing":
+                    missing[details["loc"][0]] = details["msg"]
+            if missing:
+                raise MissingSettingsError(missing=missing, settings_path=value) from err
+            raise err from None
 
     if isinstance(obj, ModuleType):
         found = _find_settings_in_module(obj)
@@ -245,3 +401,30 @@ def import_settings_from_string(value: str) -> list[BaseSettings | type[BaseSett
     if (isinstance(obj, type) and issubclass(obj, BaseSettings)) or isinstance(obj, BaseSettings):
         return [obj]
     raise ValueError(f"The {obj!r} is not a settings class.")
+
+
+def import_settings_from_strings(
+    values: Sequence[str],
+    project_dir: Path | None = None,
+    continue_on_error: bool = False,
+) -> list[BaseSettings | type[BaseSettings]]:
+    """Import settings from multiple strings and deduplicate them."""
+    result: list[BaseSettings | type[BaseSettings]] = []
+    seen: set[tuple[str, ...] | tuple[str, int]] = set()
+
+    for value in values:
+        try:
+            imported = import_settings_from_string(value, project_dir=project_dir)
+        except (ImportError, ValueError, ValidationError, FileNotFoundError) as e:
+            if continue_on_error:
+                warnings.warn(f"Failed to import settings {value!r}: {e}", stacklevel=2)
+                continue
+            raise
+
+        for obj in imported:
+            key = _settings_identity(obj)
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(obj)
+    return result

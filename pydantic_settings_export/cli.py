@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, TextIO, cast
 
 from dotenv import dotenv_values, load_dotenv
-from pydantic import Field, SkipValidation, model_validator
+from pydantic import Field, SkipValidation, ValidationError, model_validator
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.exporter import Exporter
@@ -16,7 +16,7 @@ from pydantic_settings_export.generators import AbstractGenerator
 from pydantic_settings_export.generators.simple import SimpleGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
-from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_string
+from pydantic_settings_export.utils import ObjectImportAction, import_settings_from_strings
 from pydantic_settings_export.venv import setup_venv_sys_path
 from pydantic_settings_export.version import __version__
 
@@ -77,7 +77,7 @@ class PSECLISettings(PSESettings):
     @property
     def settings(self) -> list[BaseSettings | type[BaseSettings]]:
         """Get the settings from the default_settings list."""
-        return [obj for string in (self.default_settings or []) for obj in import_settings_from_string(string)]
+        return import_settings_from_strings(self.default_settings or [], project_dir=self.project_dir)
 
     @model_validator(mode="before")
     @classmethod
@@ -300,7 +300,8 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="*",
         help=(
             "The settings classes or objects to export. "
-            "Use `module:class` or `module:variable` to use a custom settings."
+            "Use `module:class`, `module:variable`, a Python module, "
+            "a path to `.py` file, or a path to a directory to discover settings recursively."
         ),
     )
 
@@ -366,6 +367,18 @@ def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) ->
     return result
 
 
+def _load_settings_or_exit(
+    parser: argparse.ArgumentParser,
+    settings: PSECLISettings,
+) -> list[BaseSettings | type[BaseSettings]]:
+    """Load settings and exit with a CLI-friendly error on failure."""
+    try:
+        return settings.settings
+    except (ImportError, ValidationError, ValueError, FileNotFoundError) as e:
+        parser.exit(2, f"Failed to import settings: [{e.__class__.__name__}] {e}\n")
+        return []
+
+
 def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     parser = make_parser()
     args: argparse.Namespace = parser.parse_args(parse_args)
@@ -393,7 +406,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
         generators_help = _generators_help(s.generators_list)
         parser.exit(0, generators_help)
 
-    settings = s.settings
+    settings = _load_settings_or_exit(parser, s)
     if not settings:
         parser.exit(1, parser.format_help())
 

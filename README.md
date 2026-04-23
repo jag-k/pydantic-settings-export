@@ -103,6 +103,12 @@ pip install "pydantic-settings-export[toml]"  # Install with toml extra
 
     # Import an entire module (auto-discovers all BaseSettings subclasses)
     pydantic-settings-export app.settings
+
+    # Import a Python file directly
+    pydantic-settings-export ./app/settings.py
+
+    # Import all settings recursively from a directory
+    pydantic-settings-export ./app/settings
     ```
 
     > **Tip:** `pse` is a shorter alias for `pydantic-settings-export` and can be used interchangeably.
@@ -139,6 +145,13 @@ The tool is available as `pydantic-settings-export` (or the shorter alias `pse`)
 ```bash
 # Basic usage
 pydantic-settings-export your_app.settings:Settings
+
+# Import all BaseSettings subclasses from a module
+pydantic-settings-export your_app.settings
+
+# Import from a Python file or directory
+pydantic-settings-export ./your_app/settings.py
+pydantic-settings-export ./your_app/settings
 
 # Multiple generators
 pydantic-settings-export --generator markdown --generator dotenv -- your_app.settings:Settings
@@ -280,8 +293,12 @@ Basic configuration in `pyproject.toml`:
 ```toml
 [tool.pydantic_settings_export]
 project_dir = "."
-# Import a specific class or an entire module (auto-discovers all BaseSettings subclasses)
-default_settings = ["my_app.settings:AppSettings"]
+# Import a specific class, an entire module, a Python file, or a directory recursively
+default_settings = [
+    "my_app.settings:AppSettings",
+    "./my_app/settings.py",
+    "./my_app/settings",
+]
 env_file = ".env"
 # Virtual environment for importing settings (useful in pre-commit hooks)
 venv = "auto"  # auto | uv | poetry | <path> | null to disable
@@ -308,7 +325,7 @@ instead of (or in addition to) the global `default_settings`:
 ```toml
 [tool.pydantic_settings_export]
 # Applied to all generators by default
-default_settings = ["my_app.settings:AppSettings"]
+default_settings = ["my_app.settings:AppSettings", "./my_app/shared_settings"]
 
 # This generator uses only the global default_settings
 [[tool.pydantic_settings_export.generators.markdown]]
@@ -317,12 +334,12 @@ paths = ["docs/AppSettings.md"]
 # This generator overrides default_settings entirely
 [[tool.pydantic_settings_export.generators.markdown]]
 paths = ["docs/KafkaProducer.md"]
-settings = ["my_app.kafka:KafkaProducerSettings"]
+settings = ["my_app.kafka:KafkaProducerSettings", "./my_app/kafka/producer_settings.py"]
 
 # This generator extends default_settings with an extra class
 [[tool.pydantic_settings_export.generators.dotenv]]
 paths = [".env.example"]
-extend_settings = ["my_app.kafka:KafkaConsumerSettings"]
+extend_settings = ["my_app.kafka:KafkaConsumerSettings", "./my_app/kafka/consumer_settings"]
 ```
 
 | Field             | Description                                                                             |

@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 import warnings
-from inspect import getdoc, isclass
+from inspect import getdoc, getfile, isclass
 from pathlib import Path
 from types import GenericAlias
 from typing import TYPE_CHECKING, Any, ForwardRef, Literal, TypeVar, Union, cast, get_args, get_origin
@@ -285,6 +285,28 @@ def default_path(default: P, global_settings: PSESettings | None = None) -> P:
     return default
 
 
+def settings_source(settings: BaseSettings | type[BaseSettings], global_settings: PSESettings | None = None) -> str:
+    """Build a stable human-readable source reference for a settings class."""
+    settings_class: type[BaseSettings] = settings.__class__ if isinstance(settings, BaseSettings) else settings
+
+    try:
+        source_path = Path(getfile(settings_class)).resolve().absolute()
+    except (OSError, TypeError):
+        return f"{settings_class.__module__}:{settings_class.__qualname__}"
+
+    if global_settings:
+        relative_to = global_settings.project_dir.resolve().absolute()
+    else:
+        relative_to = Path.cwd().resolve().absolute()
+    try:
+        display_path = source_path.relative_to(relative_to)
+        path_string = f"./{display_path!s}"
+    except ValueError:
+        path_string = str(source_path)
+
+    return f"{path_string}:{settings_class.__qualname__}"
+
+
 class FieldInfoModel(BaseModel):
     """Info about the field of the settings model."""
 
@@ -467,6 +489,7 @@ class SettingsInfoModel(BaseModel):
     """Info about the settings model."""
 
     name: str = Field(..., description="The name of the settings model.")
+    source: str = Field("", description="The source location of the settings model.")
     docs: str = Field("", description="The documentation of the settings model.")
     env_prefix: str = Field("", description="The prefix of the environment variables.")
     field_name: str = Field("", description="The original field name (for child settings).")
@@ -485,7 +508,7 @@ class SettingsInfoModel(BaseModel):
     )
 
     @classmethod
-    def from_settings_model(
+    def from_settings_model(  # noqa: C901
         cls,
         settings: BaseSettings | type[BaseSettings],
         global_settings: PSESettings | None = None,
@@ -506,9 +529,12 @@ class SettingsInfoModel(BaseModel):
         :param env_accessible: Propagated to child fields; False → env_names=[]. Used by env generators.
         :return: Instance of SettingsInfoModel.
         """
-        is_instance = isinstance(settings, BaseSettings) and not isclass(settings)
-        instance: BaseSettings | None = settings if is_instance else None
-        settings_class: type[BaseSettings] = settings.__class__ if is_instance else settings  # type: ignore[assignment]
+        if isinstance(settings, BaseSettings):
+            instance = settings
+            settings_class = settings.__class__
+        else:
+            instance = None
+            settings_class = settings
 
         conf = settings.model_config
         with warnings.catch_warnings():
@@ -624,6 +650,7 @@ class SettingsInfoModel(BaseModel):
         )
         return cls(
             name=settings_name,
+            source=settings_source(settings, global_settings),
             docs=docs,
             env_prefix=prefix,
             field_name=field_name,
