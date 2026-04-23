@@ -280,6 +280,7 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
         :param settings_infos: The settings class to generate documentation for.
         :return: The generated documentation.
         """
+        settings_infos = tuple(self._disambiguate_settings_infos(*settings_infos))
         content = ""
         if self.generator_config.file_prefix:
             content = self.generator_config.file_prefix

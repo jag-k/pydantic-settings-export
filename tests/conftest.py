@@ -1,8 +1,86 @@
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 import pytest
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, MongoDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _relative_source(path: Path, root: Path) -> str:
+    """Return a TOML-safe relative source path."""
+    return path.relative_to(root).as_posix()
+
+
+@dataclass
+class SettingsSourcesProject:
+    """Temporary project tree with real settings modules for import tests."""
+
+    root: Path
+    module_name: str
+    module_attr: str
+    module_file: Path
+    package_dir: Path
+    discovered_dir: Path
+    problematic_dir: Path
+    empty_dir: Path
+    standalone_file: Path
+    no_settings_file: Path
+    broken_syntax_file: Path
+    broken_import_file: Path
+    text_file: Path
+
+    @property
+    def module_file_source(self) -> str:
+        """Path to the main settings file relative to the project root."""
+        return _relative_source(self.module_file, self.root)
+
+    @property
+    def discovered_dir_source(self) -> str:
+        """Path to the recursive discovery directory relative to the project root."""
+        return _relative_source(self.discovered_dir, self.root)
+
+    @property
+    def standalone_file_source(self) -> str:
+        """Path to the standalone settings file relative to the project root."""
+        return _relative_source(self.standalone_file, self.root)
+
+    @property
+    def problematic_dir_source(self) -> str:
+        """Path to the directory with partial import failures."""
+        return _relative_source(self.problematic_dir, self.root)
+
+    @property
+    def no_settings_file_source(self) -> str:
+        """Path to the file without settings relative to the project root."""
+        return _relative_source(self.no_settings_file, self.root)
+
+    @property
+    def broken_syntax_source(self) -> str:
+        """Path to the file with a syntax error relative to the project root."""
+        return _relative_source(self.broken_syntax_file, self.root)
+
+    @property
+    def broken_import_source(self) -> str:
+        """Path to the file with an import error relative to the project root."""
+        return _relative_source(self.broken_import_file, self.root)
+
+    @property
+    def text_file_source(self) -> str:
+        """Path to the non-Python file relative to the project root."""
+        return _relative_source(self.text_file, self.root)
+
+
+@dataclass
+class CollidingSettingsProject:
+    """Temporary project tree with colliding settings names across files."""
+
+    root: Path
+    sources: dict[str, list[str]]
+
+    def get_sources(self, case_name: str) -> list[str]:
+        """Get sources for a collision case."""
+        return self.sources[case_name]
 
 
 @pytest.fixture
@@ -101,3 +179,160 @@ def full_settings() -> type[BaseSettings]:
         api: APISettings = Field(default_factory=APISettings)
 
     return Settings
+
+
+@pytest.fixture
+def settings_sources_project(tmp_path: Path) -> SettingsSourcesProject:
+    """Create a temporary project tree with real settings modules."""
+    package_name = f"sample_app_{tmp_path.name.replace('-', '_')}"
+    package_dir = tmp_path / package_name
+    discovered_dir = package_dir / "discovered"
+    nested_dir = discovered_dir / "nested"
+    problematic_dir = tmp_path / "problematic"
+    empty_dir = tmp_path / "empty_settings"
+
+    for directory in (package_dir, discovered_dir, nested_dir, problematic_dir, empty_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    for directory in (package_dir, discovered_dir, nested_dir, problematic_dir):
+        (directory / "__init__.py").write_text("")
+
+    module_file = package_dir / "settings.py"
+    module_file.write_text(
+        'from pydantic_settings import BaseSettings\n\n\nclass AppSettings(BaseSettings):\n    app_name: str = "demo"\n'
+    )
+
+    (package_dir / "reexport.py").write_text("from .settings import AppSettings\n")
+
+    (discovered_dir / "database.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "\nclass DatabaseSettings(BaseSettings):\n"
+        '    dsn: str = "sqlite"\n'
+    )
+
+    (nested_dir / "cache.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n\nclass CacheSettings(BaseSettings):\n    ttl: int = 60\n"
+    )
+
+    standalone_file = tmp_path / "standalone_settings.py"
+    standalone_file.write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "\nclass StandaloneSettings(BaseSettings):\n"
+        "    enabled: bool = True\n"
+    )
+
+    no_settings_file = tmp_path / "no_settings.py"
+    no_settings_file.write_text('def make_value() -> str:\n    return "value"\n')
+
+    broken_syntax_file = tmp_path / "broken_syntax.py"
+    broken_syntax_file.write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "\nclass BrokenSettings(BaseSettings)\n"
+        "    value: str = 'broken'\n"
+    )
+
+    broken_import_file = tmp_path / "broken_import.py"
+    broken_import_file.write_text(
+        "import definitely_missing_module\n\n"
+        "from pydantic_settings import BaseSettings\n\n"
+        "\nclass BrokenImportSettings(BaseSettings):\n"
+        "    value: str = 'broken'\n"
+    )
+
+    (problematic_dir / "good_settings.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n\nclass ProblemSettings(BaseSettings):\n    retries: int = 3\n"
+    )
+
+    (problematic_dir / "broken_import.py").write_text(
+        "import definitely_missing_module\n\n"
+        "from pydantic_settings import BaseSettings\n\n"
+        "\nclass ProblemBrokenSettings(BaseSettings):\n"
+        "    value: str = 'broken'\n"
+    )
+
+    text_file = tmp_path / "notes.txt"
+    text_file.write_text("not python\n")
+
+    return SettingsSourcesProject(
+        root=tmp_path,
+        module_name=f"{package_name}.settings",
+        module_attr=f"{package_name}.settings:AppSettings",
+        module_file=module_file,
+        package_dir=package_dir,
+        discovered_dir=discovered_dir,
+        problematic_dir=problematic_dir,
+        empty_dir=empty_dir,
+        standalone_file=standalone_file,
+        no_settings_file=no_settings_file,
+        broken_syntax_file=broken_syntax_file,
+        broken_import_file=broken_import_file,
+        text_file=text_file,
+    )
+
+
+@pytest.fixture
+def colliding_settings_project(tmp_path: Path) -> CollidingSettingsProject:
+    """Create real settings files with colliding class names."""
+    package_name = f"collision_app_{tmp_path.name.replace('-', '_')}"
+    package_dir = tmp_path / package_name
+    package_dir.mkdir(parents=True, exist_ok=True)
+    (package_dir / "__init__.py").write_text("")
+
+    same_dir = package_dir / "same_impl"
+    defaults_dir = package_dir / "different_defaults"
+    shape_dir = package_dir / "different_shape"
+
+    for directory in (same_dir, defaults_dir, shape_dir):
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / "__init__.py").write_text("")
+
+    (same_dir / "first.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateSettings(BaseSettings):\n"
+        '    value: str = "same"\n'
+    )
+    (same_dir / "second.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateSettings(BaseSettings):\n"
+        '    value: str = "same"\n'
+    )
+
+    (defaults_dir / "first.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateDefaultsSettings(BaseSettings):\n"
+        '    value: str = "alpha"\n'
+    )
+    (defaults_dir / "second.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateDefaultsSettings(BaseSettings):\n"
+        '    value: str = "beta"\n'
+    )
+
+    (shape_dir / "first.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateShapeSettings(BaseSettings):\n"
+        "    host: str = 'localhost'\n"
+    )
+    (shape_dir / "second.py").write_text(
+        "from pydantic_settings import BaseSettings\n\n"
+        "class DuplicateShapeSettings(BaseSettings):\n"
+        "    port: int = 5432\n"
+    )
+
+    return CollidingSettingsProject(
+        root=tmp_path,
+        sources={
+            "same_impl": [
+                _relative_source(same_dir / "first.py", tmp_path),
+                _relative_source(same_dir / "second.py", tmp_path),
+            ],
+            "different_defaults": [
+                _relative_source(defaults_dir / "first.py", tmp_path),
+                _relative_source(defaults_dir / "second.py", tmp_path),
+            ],
+            "different_shape": [
+                _relative_source(shape_dir / "first.py", tmp_path),
+                _relative_source(shape_dir / "second.py", tmp_path),
+            ],
+        },
+    )
