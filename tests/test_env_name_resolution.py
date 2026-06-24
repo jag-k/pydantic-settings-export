@@ -22,7 +22,7 @@ Known bugs tracked here (marked as xfail):
 """
 
 import os
-from typing import Optional
+from typing import ClassVar, Optional
 
 import pytest
 from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field
@@ -1798,6 +1798,57 @@ class TestNestedBaseSettingsOwnPrefix:
         info = SettingsInfoModel.from_settings_model(settings_cls)
         parent_field_names = [f.name for f in info.fields]
         assert "child" not in parent_field_names
+
+    def test_child_own_prefix_alias_choices_are_not_double_prefixed(self, monkeypatch):
+        """Aliases on an own-prefix child BaseSettings are already complete env names."""
+
+        class EnvAliasSettings(BaseSettings):
+            model_config = SettingsConfigDict(populate_by_name=False)
+
+            env_alias_fields: ClassVar[frozenset[str]] = frozenset()
+            env_fallback_prefixes: ClassVar[tuple[str, ...]] = ()
+
+            @classmethod
+            def __pydantic_init_subclass__(cls, **kwargs: object) -> None:
+                super().__pydantic_init_subclass__(**kwargs)
+
+                env_prefix = str(cls.model_config.get("env_prefix") or "")
+                prefixes = (env_prefix, *cls.env_fallback_prefixes)
+
+                for field_name in cls.env_alias_fields:
+                    field = cls.model_fields.get(field_name)
+                    if field is None:
+                        continue
+
+                    aliases = [f"{prefix}{field_name}".upper() for prefix in prefixes]
+                    field.validation_alias = AliasChoices(*dict.fromkeys(aliases))
+
+                cls.model_rebuild(force=True)
+
+        class BaseAliasSettings(EnvAliasSettings):
+            env_alias_fields: ClassVar[frozenset[str]] = frozenset({"foo"})
+
+            foo: str = Field(default="FOO")
+
+        class SettingsA(BaseAliasSettings):
+            model_config = SettingsConfigDict(env_prefix="B_")
+            env_fallback_prefixes: ClassVar[tuple[str, ...]] = ("A_",)
+
+            bar: str = Field(default="BAR")
+
+        class Settings(BaseSettings):
+            foo: SettingsA = Field(default_factory=SettingsA)
+
+        monkeypatch.setenv("A_FOO", "from_a")
+        assert Settings().foo.foo == "from_a"
+
+        info = SettingsInfoModel.from_settings_model(Settings)
+        child = info.child_settings[0]
+        fields_by_name = {field.name: field for field in child.fields}
+
+        assert child.env_prefix == "B_"
+        assert fields_by_name["foo"].env_names == ["B_FOO", "A_FOO"]
+        assert fields_by_name["bar"].env_names == ["B_bar"]
 
 
 class TestNestedBaseSettingsThreeLevels:

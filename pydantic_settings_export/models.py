@@ -494,6 +494,7 @@ class SettingsInfoModel(BaseModel):
         field_name: str = "",
         case_sensitive: bool = False,
         env_accessible: bool = True,
+        prefix_aliases: bool = False,
     ) -> Self:
         """Generate the SettingsInfoModel using a settings model.
 
@@ -504,6 +505,7 @@ class SettingsInfoModel(BaseModel):
         :param field_name: The original field name (for child settings).
         :param case_sensitive: When True, env names are not uppercased (propagated from root).
         :param env_accessible: Propagated to child fields; False → env_names=[]. Used by env generators.
+        :param prefix_aliases: When True, field aliases are resolved via the accumulated prefix.
         :return: Instance of SettingsInfoModel.
         """
         is_instance = isinstance(settings, BaseSettings) and not isclass(settings)
@@ -526,7 +528,6 @@ class SettingsInfoModel(BaseModel):
                 case_sensitive = bool(settings.model_config.get("case_sensitive", False))
 
         populate_by_name = bool(conf.get("populate_by_name", False))
-        is_nested = bool(field_name)
 
         child_settings: list[SettingsInfoModel] = []
         fields = []
@@ -554,14 +555,17 @@ class SettingsInfoModel(BaseModel):
                     # Parent-delimiter path: {prefix}{field}{delimiter}{subfield}=value
                     child_prefix = f"{prefix}{name}{nested_delimiter}"
                     child_nested_delimiter: str | None = nested_delimiter
+                    child_prefix_aliases = True
                 elif has_own_prefix:
                     # Own-prefix path: child is a standalone BaseSettings with its own prefix.
                     # Use child's own env_prefix and its own nested_delimiter (if any).
                     child_prefix = str(annotation.model_config.get("env_prefix", ""))
                     child_nested_delimiter = annotation.model_config.get("env_nested_delimiter") or None  # type: ignore[assignment]
+                    child_prefix_aliases = False
                 else:
                     child_prefix = ""  # no env prefix — fields will have empty env_names
                     child_nested_delimiter = None
+                    child_prefix_aliases = False
 
                 child_settings.append(
                     cls.from_settings_model(
@@ -572,6 +576,7 @@ class SettingsInfoModel(BaseModel):
                         field_name=name,
                         case_sensitive=case_sensitive,
                         env_accessible=env_expandable,
+                        prefix_aliases=child_prefix_aliases,
                     )
                 )
                 if env_expandable:
@@ -584,7 +589,7 @@ class SettingsInfoModel(BaseModel):
                     global_settings,
                     instance,
                     env_prefix=prefix,
-                    is_nested=is_nested,
+                    is_nested=prefix_aliases,
                     case_sensitive=case_sensitive,
                     populate_by_name=populate_by_name,
                     env_accessible=env_accessible,
@@ -599,7 +604,7 @@ class SettingsInfoModel(BaseModel):
                     global_settings,
                     instance,
                     env_prefix=prefix,
-                    is_nested=is_nested,
+                    is_nested=prefix_aliases,
                     case_sensitive=case_sensitive,
                     populate_by_name=populate_by_name,
                     env_accessible=env_accessible,
