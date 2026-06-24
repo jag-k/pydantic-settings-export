@@ -2,6 +2,8 @@
 
 import sys
 import types
+import warnings
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +12,7 @@ from pydantic_settings_export.utils import (
     ObjectImportAction,
     _find_settings_in_module,
     import_settings_from_string,
+    import_settings_from_strings,
     make_pretty_md_table,
     make_pretty_md_table_from_dict,
 )
@@ -375,3 +378,129 @@ def test_import_settings_from_string_not_settings_class_raises() -> None:
     """Non-BaseSettings object imported via 'module:attr' raises ValueError."""
     with pytest.raises(ValueError, match="is not a settings class"):
         import_settings_from_string("pydantic_settings_export.utils:make_pretty_md_table")
+
+
+def test_import_settings_from_string_file_discovers_settings(settings_sources_project) -> None:
+    """Python file path discovers local BaseSettings subclasses."""
+    result = import_settings_from_string(
+        settings_sources_project.module_file_source,
+        project_dir=settings_sources_project.root,
+    )
+    assert [cls.__name__ for cls in result] == ["AppSettings"]
+
+
+def test_import_settings_from_string_standalone_file_discovers_settings(settings_sources_project) -> None:
+    """Standalone Python file outside a package is supported."""
+    result = import_settings_from_string(
+        settings_sources_project.standalone_file_source,
+        project_dir=settings_sources_project.root,
+    )
+    assert [cls.__name__ for cls in result] == ["StandaloneSettings"]
+
+
+def test_import_settings_from_string_directory_recursively_discovers_settings(settings_sources_project) -> None:
+    """Directory path recursively discovers BaseSettings subclasses."""
+    result = import_settings_from_string(
+        settings_sources_project.discovered_dir_source,
+        project_dir=settings_sources_project.root,
+    )
+    assert [cls.__name__ for cls in result] == ["DatabaseSettings", "CacheSettings"]
+
+
+def test_import_settings_from_string_directory_with_partial_failures_warns_and_continues(
+    settings_sources_project,
+) -> None:
+    """Broken files inside a directory should not stop discovery for valid files."""
+    with warnings.catch_warnings(record=True) as records:
+        warnings.simplefilter("always")
+        result = import_settings_from_string(
+            settings_sources_project.problematic_dir_source,
+            project_dir=settings_sources_project.root,
+        )
+
+    assert [cls.__name__ for cls in result] == ["ProblemSettings"]
+    assert len(records) == 1
+    assert "Failed to import settings from" in str(records[0].message)
+
+
+def test_import_settings_from_strings_deduplicates_old_and_new_sources(settings_sources_project) -> None:
+    """Module, module:attr, and file path should not duplicate the same class."""
+    result = import_settings_from_strings(
+        [
+            settings_sources_project.module_name,
+            settings_sources_project.module_attr,
+            settings_sources_project.module_file_source,
+            settings_sources_project.discovered_dir_source,
+            settings_sources_project.standalone_file_source,
+        ],
+        project_dir=settings_sources_project.root,
+    )
+    assert [cls.__name__ for cls in result] == [
+        "AppSettings",
+        "DatabaseSettings",
+        "CacheSettings",
+        "StandaloneSettings",
+    ]
+
+
+def test_import_settings_from_string_resolves_relative_paths_from_project_dir(
+    settings_sources_project,
+) -> None:
+    """Relative paths are resolved against the provided project_dir."""
+    result = import_settings_from_string(
+        settings_sources_project.module_file_source,
+        project_dir=settings_sources_project.root,
+    )
+    assert [cls.__name__ for cls in result] == ["AppSettings"]
+
+
+def test_import_settings_from_string_missing_path_raises_file_not_found_error(
+    settings_sources_project,
+) -> None:
+    """Missing file-system path raises FileNotFoundError."""
+    with pytest.raises(FileNotFoundError, match="does not exist"):
+        import_settings_from_string("./missing/settings.py", project_dir=settings_sources_project.root)
+
+
+def test_import_settings_from_string_non_python_file_raises_value_error(
+    settings_sources_project,
+) -> None:
+    """Non-Python file path is rejected."""
+    with pytest.raises(ValueError, match="is not a Python file"):
+        import_settings_from_string(
+            settings_sources_project.text_file_source, project_dir=settings_sources_project.root
+        )
+
+
+def test_import_settings_from_string_broken_python_file_raises_syntax_error(
+    settings_sources_project,
+) -> None:
+    """Broken Python files should raise the original import error."""
+    with pytest.raises(SyntaxError):
+        import_settings_from_string(
+            settings_sources_project.broken_syntax_source, project_dir=settings_sources_project.root
+        )
+
+
+def test_import_settings_from_string_file_without_settings_returns_empty(
+    settings_sources_project,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Python file without BaseSettings subclasses returns an empty list."""
+    result = import_settings_from_string(
+        settings_sources_project.no_settings_file_source,
+        project_dir=settings_sources_project.root,
+    )
+    assert result == []
+    assert "No BaseSettings subclasses found in file" in caplog.text
+
+
+def test_import_settings_from_string_empty_directory_returns_empty(
+    settings_sources_project,
+) -> None:
+    """Directory without Python settings files returns an empty list."""
+    result = import_settings_from_string(
+        f"./{Path(settings_sources_project.empty_dir).relative_to(settings_sources_project.root)!s}",
+        project_dir=settings_sources_project.root,
+    )
+    assert result == []

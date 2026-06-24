@@ -1,13 +1,12 @@
 import warnings
 from pathlib import Path
 
-from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.generators.abstract import AbstractGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
-from pydantic_settings_export.utils import import_settings_from_string
+from pydantic_settings_export.utils import import_settings_from_strings
 
 __all__ = ("Exporter",)
 
@@ -50,13 +49,11 @@ class Exporter:
             return cache[key]
 
         def _import_all(strings: list[str]) -> list[BaseSettings | type[BaseSettings]]:
-            result: list[BaseSettings | type[BaseSettings]] = []
-            for string in strings:
-                try:
-                    result.extend(import_settings_from_string(string))
-                except (ImportError, ValueError, ValidationError) as e:
-                    warnings.warn(f"Failed to import settings {string!r}: {e}", stacklevel=3)
-            return result
+            return import_settings_from_strings(
+                strings,
+                project_dir=self.settings.project_dir,
+                continue_on_error=True,
+            )
 
         default_infos = [_parse(s) for s in settings]
         paths: list[Path] = []

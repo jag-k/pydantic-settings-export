@@ -2,7 +2,6 @@
 
 import argparse
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -306,27 +305,31 @@ def test_main_cli_settings_replaces_default_settings(tmp_path: Path) -> None:
     Previously, args.settings was never wired to s.default_settings, so passing
     settings via CLI was silently ignored and main() exited with code 1.
     """
+    output_file = tmp_path / "output.txt"
     config_file = tmp_path / "pyproject.toml"
     # No default_settings in config — proves that CLI args alone are enough
-    config_file.write_text("[tool.pydantic_settings_export]\n")
+    config_file.write_text(
+        "[tool.pydantic_settings_export]\n\n"
+        "[[tool.pydantic_settings_export.generators.simple]]\n"
+        f'paths = ["{output_file.as_posix()}"]\n'
+    )
 
-    with (
-        patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")),
-        patch("pydantic_settings_export.cli.Exporter") as mock_exporter_cls,
-    ):
-        mock_exporter_cls.return_value.run_all.return_value = []
-        with pytest.raises(SystemExit) as exc_info:
-            main([
-                "--config-file",
-                str(config_file),
-                "--venv",
-                "",
-                "pydantic_settings_export.settings:PSESettings",
-            ])
+    with pytest.raises(SystemExit) as exc_info:
+        main([
+            "--config-file",
+            str(config_file),
+            "--venv",
+            "",
+            "--generator",
+            "simple",
+            "--",
+            "pydantic_settings_export.settings:PSESettings",
+        ])
 
     # 0 = settings found and processed; 1 = no settings found (the old bug)
     assert exc_info.value.code == 0
-    mock_exporter_cls.return_value.run_all.assert_called_once()
+    assert output_file.exists()
+    assert "Global Settings" in output_file.read_text()
 
 
 def test_main_exits_when_no_settings_provided(tmp_path: Path) -> None:
@@ -334,8 +337,103 @@ def test_main_exits_when_no_settings_provided(tmp_path: Path) -> None:
     config_file = tmp_path / "pyproject.toml"
     config_file.write_text("[tool.pydantic_settings_export]\n")
 
-    with patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")):
-        with pytest.raises(SystemExit) as exc_info:
-            main(["--config-file", str(config_file), "--venv", ""])
+    with pytest.raises(SystemExit) as exc_info:
+        main(["--config-file", str(config_file), "--venv", ""])
 
     assert exc_info.value.code == 1
+
+
+def test_main_supports_mixed_old_and_new_sources_from_config(settings_sources_project) -> None:
+    """Config default_settings may mix module, file, and directory sources."""
+    output_file = settings_sources_project.root / "config-output.txt"
+    config_file = settings_sources_project.root / "pyproject.toml"
+    config_file.write_text(
+        "[tool.pydantic_settings_export]\n"
+        "default_settings = [\n"
+        f'    "{settings_sources_project.module_name}",\n'
+        f'    "{settings_sources_project.standalone_file_source}",\n'
+        f'    "{settings_sources_project.discovered_dir_source}",\n'
+        "]\n\n"
+        "[[tool.pydantic_settings_export.generators.simple]]\n"
+        f'paths = ["{output_file.as_posix()}"]\n'
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main([
+            "--project-dir",
+            str(settings_sources_project.root),
+            "--config-file",
+            str(config_file),
+            "--venv",
+            "",
+            "--generator",
+            "simple",
+        ])
+
+    assert exc_info.value.code == 0
+    content = output_file.read_text()
+    assert "AppSettings" in content
+    assert "DatabaseSettings" in content
+    assert "CacheSettings" in content
+    assert "StandaloneSettings" in content
+
+
+def test_main_positional_sources_replace_config_default_settings(settings_sources_project) -> None:
+    """CLI positional settings should replace config default_settings with mixed sources."""
+    output_file = settings_sources_project.root / "cli-output.txt"
+    config_file = settings_sources_project.root / "pyproject.toml"
+    config_file.write_text(
+        "[tool.pydantic_settings_export]\n"
+        f'default_settings = ["{settings_sources_project.standalone_file_source}"]\n\n'
+        "[[tool.pydantic_settings_export.generators.simple]]\n"
+        f'paths = ["{output_file.as_posix()}"]\n'
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main([
+            "--project-dir",
+            str(settings_sources_project.root),
+            "--config-file",
+            str(config_file),
+            "--venv",
+            "",
+            "--generator",
+            "simple",
+            "--",
+            settings_sources_project.module_attr,
+            settings_sources_project.discovered_dir_source,
+        ])
+
+    assert exc_info.value.code == 0
+    content = output_file.read_text()
+    assert "AppSettings" in content
+    assert "DatabaseSettings" in content
+    assert "CacheSettings" in content
+    assert "StandaloneSettings" not in content
+
+
+def test_main_invalid_settings_path_exits_with_code_2(settings_sources_project) -> None:
+    """Invalid file-system path should produce a CLI error."""
+    output_file = settings_sources_project.root / "invalid-output.txt"
+    config_file = settings_sources_project.root / "pyproject.toml"
+    config_file.write_text(
+        "[tool.pydantic_settings_export]\n\n"
+        "[[tool.pydantic_settings_export.generators.simple]]\n"
+        f'paths = ["{output_file.as_posix()}"]\n'
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main([
+            "--project-dir",
+            str(settings_sources_project.root),
+            "--config-file",
+            str(config_file),
+            "--venv",
+            "",
+            "--generator",
+            "simple",
+            "--",
+            "./missing/settings.py",
+        ])
+
+    assert exc_info.value.code == 2

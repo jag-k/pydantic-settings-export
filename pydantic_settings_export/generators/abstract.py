@@ -43,7 +43,7 @@ class BaseGeneratorSettings(BaseModel):
             "When non-empty, only these settings are exported — ``default_settings`` and "
             "``extend_settings`` are ignored for this generator."
         ),
-        examples=[["app.settings:MySettings"]],
+        examples=[["app.settings:MySettings"], ["./app/settings.py"], ["./app/settings"]],
     )
 
     extend_settings: list[str] = Field(
@@ -52,7 +52,7 @@ class BaseGeneratorSettings(BaseModel):
             "Additional settings to include alongside the global ``default_settings`` "
             "for this generator configuration. Ignored when ``settings`` is non-empty."
         ),
-        examples=[["app.extra_settings:ExtraSettings"]],
+        examples=[["app.extra_settings:ExtraSettings"], ["./app/extra_settings.py"], ["./app/extra_settings"]],
     )
 
     def __bool__(self) -> bool:
@@ -144,12 +144,29 @@ class AbstractGenerator(ABC, Generic[C]):
         """
         raise NotImplementedError
 
+    @staticmethod
+    def _disambiguate_settings_infos(*settings_infos: SettingsInfoModel) -> list[SettingsInfoModel]:
+        """Make duplicate top-level settings names explicit in the output."""
+        names = [settings_info.name for settings_info in settings_infos]
+        duplicate_names = {name for name in names if names.count(name) > 1}
+        if not duplicate_names:
+            return list(settings_infos)
+
+        result = []
+        for settings_info in settings_infos:
+            if settings_info.name not in duplicate_names:
+                result.append(settings_info)
+                continue
+            result.append(settings_info.model_copy(update={"name": f"{settings_info.name} [{settings_info.source}]"}))
+        return result
+
     def generate(self, *settings_infos: SettingsInfoModel) -> str:
         """Generate the configuration file content.
 
         :param settings_infos: The settings info classes to generate documentation for.
         :return: The generated documentation.
         """
+        settings_infos = tuple(self._disambiguate_settings_infos(*settings_infos))
         return "\n\n".join(self.generate_single(s).strip() for s in settings_infos).strip() + "\n"
 
     def file_paths(self) -> list[Path]:
