@@ -320,7 +320,7 @@ class FieldInfoModel(BaseModel):
 
     @property
     def full_name(self) -> str:
-        """Get the display name (first alias if present, otherwise field name)."""
+        """Getting the display name (first alias if present, otherwise field name)."""
         return self.aliases[0] if self.aliases else self.name
 
     def has_examples(self) -> bool:
@@ -336,11 +336,11 @@ class FieldInfoModel(BaseModel):
         :return: Raw JSON-serialisable Python value, or :data:`~pydantic_core.PydanticUndefined`
             when the field has no default (i.e. it is required).
         """
-        default: object | PydanticUndefined = field.default  # type: ignore[valid-type]
+        default: object | PydanticUndefined = field.default  # type: ignore[valid-type, ty:invalid-type-form]
 
         if default is PydanticUndefined and field.default_factory:
             try:
-                default = field.default_factory()
+                default = field.default_factory()  # ty:ignore[missing-argument]
             except Exception:
                 logger.warning("Failed to compute default value for field %s", field)
                 return PydanticUndefined

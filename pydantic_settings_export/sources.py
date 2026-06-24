@@ -38,7 +38,7 @@ class TomlSettings(BaseSettings):
             return init_settings, env_settings, dotenv_settings, file_secret_settings
 
         if isinstance(toml_file, Sequence):
-            toml_file = toml_file[0]
+            toml_file = toml_file[0]  # type: ignore[ty:invalid-assignment]
 
         toml_settings_source: type[TomlConfigSettingsSource] = TomlConfigSettingsSource
 
@@ -48,7 +48,10 @@ class TomlSettings(BaseSettings):
 
         return (
             init_settings,
-            toml_settings_source(settings_cls, toml_file=Path(toml_file)),
+            toml_settings_source(
+                settings_cls,
+                toml_file=Path(toml_file),  # type: ignore[ty:invalid-argument-type]
+            ),
             env_settings,
             dotenv_settings,
             file_secret_settings,

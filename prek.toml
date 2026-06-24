@@ -1,0 +1,135 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+
+default_stages = ["pre-commit"]
+default_install_hook_types = ["pre-commit"]
+default_language_version = { python = "python3.10" }
+
+[[repos]]
+repo = "https://github.com/pre-commit/pre-commit-hooks"
+rev = "v6.0.0"
+hooks = [
+    { id = "check-ast" },
+    { id = "check-json" },
+    {
+        id = "pretty-format-json",
+        args = [
+            "--autofix",
+            "--indent=4"
+        ]
+    },
+    { id = "check-toml" },
+    { id = "check-yaml" },
+    { id = "check-xml" },
+    { id = "end-of-file-fixer" },
+    { id = "check-docstring-first" },
+    {
+        id = "trailing-whitespace",
+        exclude = ".md$"
+    },
+    { id = "check-added-large-files" },
+    { id = "detect-private-key" },
+    {
+        id = "name-tests-test",
+        args = ["--pytest-test-first"]
+    }
+]
+
+[[repos]]
+repo = "https://github.com/python-jsonschema/check-jsonschema"
+rev = "0.37.3"
+hooks = [
+    { id = "check-github-workflows" },
+    {
+        id = "check-jsonschema",
+        name = "Check prek.toml",
+        files = '^prek\.toml$',
+        types = ["toml"],
+        args = [
+            "--schemafile",
+            "https://json.schemastore.org/prek"
+        ]
+    },
+    {
+        id = "check-jsonschema",
+        name = "Check .pre-commit-hooks.yml",
+        files = '^\.pre-commit-hooks\.ya?ml$',
+        types = ["yaml"],
+        args = [
+            "--schemafile",
+            "https://json.schemastore.org/pre-commit-hooks"
+        ]
+    }
+]
+
+[[repos]]
+repo = "https://github.com/ComPWA/taplo-pre-commit"
+rev = "v0.9.3"
+hooks = [
+    { id = "taplo-format" }
+]
+
+[[repos]]
+repo = "https://github.com/bwhmather/ssort"
+rev = "0.16.0"
+hooks = [
+    {
+        id = "ssort",
+        entry = "ssort"
+    }
+]
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.19"
+hooks = [
+    {
+        id = "ruff-check",
+        args = ["--fix"]
+    },
+    { id = "ruff-format" }
+]
+
+[[repos]]
+repo = "https://github.com/astral-sh/ty-pre-commit"
+rev = "v0.0.53"
+hooks = [
+    { id = "ty" }
+]
+
+[[repos]]
+repo = "https://github.com/astral-sh/uv-pre-commit"
+rev = "0.11.24"
+hooks = [
+    { id = "uv-lock" },
+    {
+        id = "uv-export",
+        args = [
+            "--output-file=pylock.toml",
+            "-q"
+        ]
+    },
+    {
+        id = "uv-sync",
+        args = ["--all-extras"]
+    }
+]
+
+[[repos]]
+repo = "local"
+hooks = [
+    {
+        id = "pydantic-settings-export",
+        name = "pydantic-settings-export",
+        entry = "uv",
+        args = [
+            "run",
+            "pydantic-settings-export"
+        ],
+        language = "unsupported",
+        files = '\.py$',
+        pass_filenames = false,
+        verbose = true
+    }
+]

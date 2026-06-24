@@ -1,4 +1,4 @@
-exclude = ["pylock.toml"]
+exclude = ["pylock.toml", "prek.toml"]
 
 [formatting]
 align_comments = false

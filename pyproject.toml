@@ -63,8 +63,8 @@ toml = [
 
 [dependency-groups]
 dev = [
-    "mypy>=1.12.1",
-    "pre-commit>=4.0.1",
+    "ty>=0.0.53",
+    "prek>=0.1.0",
     "ruff>=0.7.0",
     "ssort>=0.13.0",
     "types-pyyaml>=6.0.12.20240917",
@@ -162,40 +162,27 @@ section-order = [
 ]
 known-first-party = ["pydantic_settings_export"]
 
-# https://mypy.readthedocs.io/en/stable/config_file.html
-[tool.mypy]
-python_version = "3.10"
-ignore_missing_imports = true
-scripts_are_modules = true
-allow_redefinition = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-warn_no_return = false
-show_error_context = true
-show_column_numbers = true
-show_error_codes = true
-color_output = false
-pretty = true
+# https://docs.astral.sh/ty/reference/configuration/
+[tool.ty.src]
 exclude = [
-    '^setup\.py$',
-    '^tmp\.py$',
-    '^venv/',
-    'test.+\.py$',
-    'conftest\.py$',
-    '^tests/',
-    '^prompt\.py$',
-]
-disable_error_code = [
-    "call-arg",
+    "setup.py",
+    "tmp.py",
+    "venv/",
+    "test*.py",
+    "conftest.py",
+    "tests/",
+    "prompt.py",
 ]
 
-[[tool.mypy.overrides]]
-module = "pydantic_settings_export.settings"
-disable_error_code = ["arg-type"]
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-disable_error_code = ["arg-type", "no-untyped-def"]
+[tool.ty.rules]
+#deprecated = "ignore"
+#invalid-type-form = "ignore"
+#no-matching-overload = "ignore"
+#missing-argument = "ignore"
+#invalid-assignment = "ignore"
+#invalid-argument-type = "ignore"
+#invalid-return-type = "ignore"
+#mismatched-type-name = "ignore"
 
 [tool.coverage.report]
 exclude_lines = [

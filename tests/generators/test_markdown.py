@@ -46,7 +46,7 @@ def test_markdown_with_nested_settings(nested_settings: type[BaseSettings]) -> N
 
 
 def test_markdown_with_env_prefix() -> None:
-    """Test Markdown generation shows environment prefix."""
+    """Test Markdown generation shows the environment prefix."""
 
     class Settings(BaseSettings):
         model_config = SettingsConfigDict(env_prefix="APP_")
@@ -71,7 +71,7 @@ def test_markdown_column_visibility_name_only(simple_settings: type[BaseSettings
     generator = MarkdownGenerator(
         generator_config=MarkdownSettings(
             file_prefix="",
-            table_headers=[TableHeadersEnum.Name],  # type: ignore[attr-defined]
+            table_headers=[TableHeadersEnum.Name],
         )
     )
     result = generator.generate(SettingsInfoModel.from_settings_model(simple_settings))
@@ -90,9 +90,9 @@ def test_markdown_column_visibility_custom_order(simple_settings: type[BaseSetti
         generator_config=MarkdownSettings(
             file_prefix="",
             table_headers=[
-                TableHeadersEnum.Description,  # type: ignore[attr-defined]
-                TableHeadersEnum.Name,  # type: ignore[attr-defined]
-                TableHeadersEnum.Type,  # type: ignore[attr-defined]
+                TableHeadersEnum.Description,
+                TableHeadersEnum.Name,
+                TableHeadersEnum.Type,
             ],
         )
     )
@@ -245,7 +245,7 @@ def test_markdown_with_union_types() -> None:
     generator = MarkdownGenerator(generator_config=MarkdownSettings(file_prefix=""))
     result = generator.generate(SettingsInfoModel.from_settings_model(Settings))
 
-    # Pipe is escaped in markdown tables as \|
+    # Pipe is escaped in Markdown tables as \|
     assert "`string` \\| `integer`" in result
 
 

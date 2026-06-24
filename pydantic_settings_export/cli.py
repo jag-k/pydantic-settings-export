@@ -11,6 +11,7 @@ from dotenv import dotenv_values, load_dotenv
 from pydantic import Field, SkipValidation, model_validator
 from pydantic_settings import BaseSettings
 
+from pydantic_settings_export.compatibility import FileType
 from pydantic_settings_export.exporter import Exporter
 from pydantic_settings_export.generators import AbstractGenerator
 from pydantic_settings_export.generators.simple import SimpleGenerator
@@ -54,7 +55,7 @@ Generators = AbstractGenerator.create_generator_config_model(multiple_for_single
 class PSECLISettings(PSESettings):
     """The settings for the CLI."""
 
-    generators: Generators = Field(  # type: ignore[valid-type]
+    generators: Generators = Field(  # type: ignore[valid-type, ty:invalid-type-form]
         default_factory=Generators,
         description="The configuration of generators.",
         exclude=True,
@@ -76,7 +77,7 @@ class PSECLISettings(PSESettings):
 
     @property
     def settings(self) -> list[BaseSettings | type[BaseSettings]]:
-        """Get the settings from the default_settings list."""
+        """Getting the settings from the default_settings list."""
         return [obj for string in (self.default_settings or []) for obj in import_settings_from_string(string)]
 
     @model_validator(mode="before")
@@ -268,7 +269,7 @@ def make_parser() -> argparse.ArgumentParser:
         "-e",
         nargs="+",
         default=[],
-        type=argparse.FileType("r"),
+        type=FileType("r"),
         help="Use the .env file to load environment variables. Can be used multiple times. (default: [])",
     )
     config_group.add_argument(

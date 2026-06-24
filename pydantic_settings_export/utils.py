@@ -6,7 +6,7 @@ import sys
 from collections.abc import Sequence
 from inspect import isclass
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ImportString, TypeAdapter
 from pydantic_core import ValidationError
@@ -195,7 +195,7 @@ def _find_settings_in_module(module: ModuleType) -> list[type[BaseSettings]]:
     """
     module_name = module.__name__
     return [
-        obj
+        cast(type[BaseSettings], obj)
         for obj in vars(module).values()
         if (
             isclass(obj)  # If it's a class
@@ -240,7 +240,7 @@ def import_settings_from_string(value: str) -> list[BaseSettings | type[BaseSett
         found = _find_settings_in_module(obj)
         if not found:
             logger.warning("No BaseSettings subclasses found in module %r", value)
-        return found  # type: ignore[return-value]
+        return found  # type: ignore[return-value, ty:invalid-return-type]
 
     if (isinstance(obj, type) and issubclass(obj, BaseSettings)) or isinstance(obj, BaseSettings):
         return [obj]

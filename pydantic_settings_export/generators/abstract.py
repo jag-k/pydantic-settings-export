@@ -213,7 +213,7 @@ class AbstractGenerator(ABC, Generic[C]):
 
             if multiple_for_single:
                 return (
-                    list[config],  # type: ignore[valid-type]
+                    list[config],  # type: ignore[valid-type, ty:invalid-type-form]
                     Field(default_factory=lambda: [config()]),
                 )
             return (
@@ -224,7 +224,7 @@ class AbstractGenerator(ABC, Generic[C]):
         fields: dict[str, tuple[Any, Any]] = {
             name: _make_arg(generator) for name, generator in AbstractGenerator.generators().items()
         }
-        return create_model(  # type: ignore[call-overload]
+        return create_model(  # type: ignore[call-overload, ty:no-matching-overload]
             "Generators",
             **fields,
             __base__=BaseModel,

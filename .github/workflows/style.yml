@@ -27,8 +27,8 @@ jobs:
 
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-3|${{ hashFiles('.pre-commit-config.yaml') }}
+          path: ~/.cache/prek
+          key: prek-1|${{ hashFiles('prek.toml') }}
 
-      - name: Run pre-commit
-        run: uv run --frozen --no-editable pre-commit run --all-files --show-diff-on-failure --color=always
+      - name: Run prek
+        run: uv run --frozen --no-editable prek run --all-files --show-diff-on-failure --color=always

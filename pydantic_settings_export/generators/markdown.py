@@ -35,7 +35,7 @@ class TableRowDict(TypedDict):
 
 
 TableHeadersEnum = Enum(  # type: ignore[misc]
-    "TableHeaders",
+    "TableHeadersEnum",
     [(h, h) for h in TableRowDict.__annotations__.keys()],
     type=str,
 )
