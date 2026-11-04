@@ -102,6 +102,18 @@ def test_dotenv_with_examples() -> None:
     assert result == '# FIELD="default"  # "ex1", "ex2"\n'
 
 
+def test_dotenv_non_ascii_default() -> None:
+    """Test non-ASCII characters are written as is, not as ``\\u`` escapes."""
+
+    class Settings(BaseSettings):
+        title: str = Field(default="Café de l’État")
+
+    generator = DotEnvGenerator(generator_config=DotEnvSettings(split_by_group=False))
+    result = generator.generate(SettingsInfoModel.from_settings_model(Settings))
+
+    assert result == '# TITLE="Café de l’État"\n'
+
+
 def test_dotenv_without_examples() -> None:
     """Test examples are not added when add_examples=False."""
 
