@@ -339,3 +339,124 @@ def test_main_exits_when_no_settings_provided(tmp_path: Path) -> None:
             main(["--config-file", str(config_file), "--venv", ""])
 
     assert exc_info.value.code == 1
+
+
+# =============================================================================
+# --check mode
+# =============================================================================
+
+
+def test_parser_check_default() -> None:
+    """Test --check is disabled by default."""
+    assert make_parser().parse_args([]).check is False
+    assert make_parser().parse_args(["--check"]).check is True
+
+
+def _run_main(config_file: Path, tmp_path: Path, *extra: str) -> int | str | None:
+    with patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")):
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "--config-file",
+                str(config_file),
+                "--project-dir",
+                str(tmp_path),
+                "--venv",
+                "",
+                *extra,
+                "pydantic_settings_export.settings:PSESettings",
+            ])
+    return exc_info.value.code
+
+
+def test_main_check_reports_missing_and_outdated_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must not write files, print a diff and exit with 1 while files are out of date."""
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "docs" / "settings.txt"
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(f"[[tool.pydantic_settings_export.generators.simple]]\npaths = [{str(out)!r}]\n")
+
+    # Missing file
+    assert _run_main(config_file, tmp_path, "--check") == 1
+    assert not out.exists()
+    stdout = capsys.readouterr().out
+    assert "--- /dev/null\n+++ b/docs/settings.txt\n" in stdout
+    assert "Files out of date (1):\n- docs/settings.txt\n" in stdout
+
+    # Generate and check again
+    assert _run_main(config_file, tmp_path) == 0
+    generated = out.read_text(encoding="utf-8")
+    capsys.readouterr()
+    assert _run_main(config_file, tmp_path, "--check") == 0
+    assert "All files are up to date." in capsys.readouterr().out
+
+    # Outdated file
+    out.write_text(generated.replace("Default:", "Old default:", 1), encoding="utf-8")
+    assert _run_main(config_file, tmp_path, "--check") == 1
+    stdout = capsys.readouterr().out
+    assert "--- a/docs/settings.txt\n+++ b/docs/settings.txt\n" in stdout
+    assert "\n-Old default:" in stdout
+    assert "\n+Default:" in stdout
+    assert out.read_text(encoding="utf-8") != generated
+
+
+def test_format_diff_marks_missing_newline_at_end_of_file(tmp_path: Path) -> None:
+    """Lines without a trailing newline must not run together with the next diff line."""
+    from pydantic_settings_export.cli import _format_diff
+    from pydantic_settings_export.generators.abstract import FileChange
+
+    diff = _format_diff(FileChange(tmp_path / "f.txt", "old", "new\n"))
+
+    assert "-old\n\\ No newline at end of file\n+new\n" in diff
+    assert diff.endswith("\n")
+
+
+def test_main_check_fails_when_files_cannot_be_verified(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must fail, not report success, when a configured file cannot be checked."""
+    pytest.importorskip("text_region_parser")
+    monkeypatch.chdir(tmp_path)
+    missing = tmp_path / "missing.md"
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        f'[[tool.pydantic_settings_export.generators.markdown]]\npaths = [{str(missing)!r}]\nregion = "config"\n'
+    )
+
+    with pytest.warns(UserWarning, match="does not exist"):
+        assert _run_main(config_file, tmp_path, "--check") == 1
+
+    stdout = capsys.readouterr().out
+    assert "Check failed, some files could not be verified (1):" in stdout
+    assert "All files are up to date." not in stdout
+
+
+def test_main_check_fails_when_generator_cannot_be_initialized(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must fail when a configured generator is dropped because it failed to initialize."""
+    from pydantic_settings_export.exceptions import ExportWarning
+    from pydantic_settings_export.generators.simple import SimpleGenerator
+
+    monkeypatch.chdir(tmp_path)
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("[[tool.pydantic_settings_export.generators.simple]]\npaths = ['out.txt']\n")
+
+    def _broken_init(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("broken generator")
+
+    monkeypatch.setattr(SimpleGenerator, "__init__", _broken_init)
+
+    with pytest.warns(ExportWarning, match="broken generator"):
+        assert _run_main(config_file, tmp_path, "--check") == 1
+
+    stdout = capsys.readouterr().out
+    assert "Check failed, some files could not be verified (1):" in stdout
+    assert "All files are up to date." not in stdout

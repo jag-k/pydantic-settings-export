@@ -141,9 +141,17 @@ pydantic-settings-export --generator markdown dotenv -- --help-generators
 
 # Inspect all generator configuration fields
 pydantic-settings-export --help-generators
+
+# Check that generated files are up to date without writing them (for CI)
+pydantic-settings-export --check
 ```
 
 CLI options override environment variables and `pyproject.toml`.
+
+With `--check`, nothing is written: a unified diff of every missing or outdated file is printed, and the command
+exits with code `1` if there is at least one, or `0` if everything is up to date. Problems that are only warnings
+during a normal run (a failed generator, settings that cannot be imported, a missing Markdown region file) also make
+the check fail, since those files could not be verified.
 
 ## Configuration
 
@@ -271,8 +279,16 @@ repos:
     hooks:
       - id: pydantic-settings-export
         files: ^app/settings\.py$
+```
+
+The hooks install all extras (`email`, `regions`, `toml`) by default. Setting `additional_dependencies` replaces that
+default, so keep `.[all]` (or the extras you need) in the list when adding your own packages:
+
+```yaml
+      - id: pydantic-settings-export
         additional_dependencies:
-          - pydantic-settings-export[email,regions,toml]
+          - .[all]
+          - my-private-package
 ```
 
 When the hook needs to import packages from your project, configure venv discovery:
@@ -283,6 +299,14 @@ venv = "auto"
 ```
 
 Detection order for `"auto"` is `./venv`, `./.venv`, uv, then Poetry.
+
+Use the `pydantic-settings-export-check` hook instead to fail on outdated files without regenerating them,
+for example in CI. It runs on every commit, because changing only generated files or the configuration can make
+them out of date:
+
+```yaml
+      - id: pydantic-settings-export-check
+```
 
 ## Python API
 
@@ -313,6 +337,10 @@ generators = [
 ]
 
 updated_files = Exporter(settings, generators).run_all(AppSettings)
+
+# Or only compute what would change, without writing anything
+for change in Exporter(settings, generators).changes_all(AppSettings):
+    print(change.path, "is missing" if change.old_content is None else "is out of date")
 ```
 
 You can pass a settings instance instead of a class when the generated output should include runtime values:
@@ -321,6 +349,15 @@ You can pass a settings instance instead of a class when the generated output sh
 app_settings = AppSettings(api_key="secret", debug=True)
 Exporter(settings, generators).run_all(app_settings)
 ```
+
+### Custom Generators
+
+Subclass `AbstractGenerator`, give it a `name` and a `config`, and implement `generate_single()`.
+Pass it to the CLI with `--generator module:Class`.
+
+To customize how files are produced (as the Markdown `region` option does), override `changes()` and return the list
+of `FileChange` objects. `run()` writes exactly these changes, and `--check` compares them, so both stay consistent.
+Do not override `run()`: it is final, `--check` ignores such overrides, and doing so emits a `DeprecationWarning`.
 
 ## Examples
 

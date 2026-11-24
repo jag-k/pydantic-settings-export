@@ -206,3 +206,54 @@ def test_run_writes_and_reads_utf8_regardless_of_default_encoding(
     assert (tmp_path / "out.txt").read_bytes().decode("utf-8") == "Alpha: Café ✓\n"
     # The second run reads the file back and must detect that nothing changed.
     assert gen.run(si) == []
+
+
+def test_overriding_run_warns(file_paths_gen: type[AbstractGenerator]) -> None:  # type: ignore[type-arg]
+    """Overriding run() bypasses --check, so it must emit a DeprecationWarning pointing to changes()."""
+    with pytest.warns(DeprecationWarning, match=r"overrides `run\(\)`.*Override `changes\(\)` instead"):
+
+        class _RunOverrideGen(file_paths_gen):  # type: ignore[valid-type,misc]
+            name = "_test_run_override_gen"
+
+            def run(self, *settings_info):  # type: ignore[override]  # ty: ignore[override-of-final-method]
+                return []
+
+
+def test_overriding_changes_does_not_warn(file_paths_gen: type[AbstractGenerator]) -> None:  # type: ignore[type-arg]
+    """Overriding changes() is the supported extension point and must not warn."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+
+        class _ChangesOverrideGen(file_paths_gen):  # type: ignore[valid-type,misc]
+            name = "_test_changes_override_gen"
+
+            def changes(self, *settings_info):  # type: ignore[override]
+                return []
+
+
+def test_run_continues_after_unwritable_file(
+    file_paths_gen: type[AbstractGenerator],
+    tmp_path: Path,
+) -> None:  # type: ignore[type-arg]
+    """One file that cannot be written must not stop the other files from being written."""
+    from pydantic_settings_export.exceptions import ExportWarning
+    from pydantic_settings_export.models import SettingsInfoModel
+
+    class _Gen(file_paths_gen):  # type: ignore[valid-type,misc]
+        name = "_test_unwritable_gen"
+
+        def generate_single(self, settings_info, level: int = 1) -> str:  # type: ignore[override]
+            return "content"
+
+    unwritable = tmp_path / "is_a_dir"
+    unwritable.mkdir()
+    writable = tmp_path / "ok.txt"
+    gen = _Gen(generator_config=file_paths_gen.config(paths=[unwritable, writable], per_settings=False))
+
+    with pytest.warns(ExportWarning, match="Failed to write"):
+        written = gen.run(SettingsInfoModel(name="A", fields=[]))
+
+    assert written == [writable]
+    assert writable.read_text(encoding="utf-8") == "content\n"

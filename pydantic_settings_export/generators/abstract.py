@@ -1,10 +1,13 @@
 import inspect
+import warnings
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar, cast, final
 
 from pydantic import BaseModel, Field, create_model
 
+from pydantic_settings_export.exceptions import ExportWarning
 from pydantic_settings_export.settings import PSESettings
 
 if TYPE_CHECKING:
@@ -19,7 +22,25 @@ __all__ = (
     "AbstractGenerator",
     "BaseEnvGeneratorSettings",
     "BaseGeneratorSettings",
+    "FileChange",
 )
+
+
+@dataclass(frozen=True)
+class FileChange:
+    """A pending change of a generated file."""
+
+    path: Path
+    old_content: str | None
+    new_content: str
+    """The path to the file."""
+    """The current content of the file, or ``None`` if the file does not exist."""
+    """The content the file should have."""
+
+    def apply(self) -> None:
+        """Write the new content to the file, creating parent directories if needed."""
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(self.new_content, encoding="utf-8")
 
 
 class BaseGeneratorSettings(BaseModel):
@@ -105,6 +126,14 @@ class AbstractGenerator(ABC, Generic[C]):
         """Initialize the subclass."""
         check_name = kwargs.pop("check_name", False)
         super().__init_subclass__(**kwargs)
+        if "run" in cls.__dict__:
+            warnings.warn(
+                f"{cls.__qualname__} overrides `run()`, which is ignored by `--check` and will become an error "
+                f"in a future release. Override `changes()` instead: return the list of `FileChange` objects, "
+                f"and `run()` will write them.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if "name" not in cls.__dict__:
             if check_name:
                 raise ValueError("Generator must have a name")
@@ -167,23 +196,39 @@ class AbstractGenerator(ABC, Generic[C]):
             file_paths.append(self.settings.root_dir / p)
         return file_paths
 
+    def changes(self, *settings_info: SettingsInfoModel) -> list[FileChange]:
+        """Compute the changes to generated files without writing them.
+
+        :param settings_info: The settings info to generate documentation for.
+        :return: The changes for files whose content differs from the generated one.
+        """
+        result = self.generate(*settings_info)
+        changes: list[FileChange] = []
+        for path in self.file_paths():
+            old_content = path.read_text(encoding="utf-8") if path.is_file() else None
+            if old_content != result:
+                changes.append(FileChange(path, old_content, result))
+        return changes
+
+    @final
     def run(self, *settings_info: SettingsInfoModel) -> list[Path]:
-        """Run the generator.
+        """Run the generator: write all changes computed by :meth:`changes`.
+
+        Do not override this method; override :meth:`changes` instead, so ``--check`` sees the same result.
 
         :param settings_info: The settings info to generate documentation for.
         :return: The list of file paths is written to.
         """
-        updated_files: list[Path] = []
-        result = self.generate(*settings_info)
-        for path in self.file_paths():
-            if path.is_file() and path.read_text(encoding="utf-8") == result:
-                # No need to update the file
+        written: list[Path] = []
+        for change in self.changes(*settings_info):
+            try:
+                change.apply()
+            except OSError as e:
+                # Keep writing other files; one unwritable file must not block the rest.
+                warnings.warn(f"Failed to write {change.path}: {e}", ExportWarning, stacklevel=2)
                 continue
-
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(result, encoding="utf-8")
-            updated_files.append(path)
-        return updated_files
+            written.append(change.path)
+        return written
 
     @staticmethod
     @final

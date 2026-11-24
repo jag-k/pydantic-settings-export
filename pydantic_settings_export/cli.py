@@ -1,4 +1,5 @@
 import argparse
+import difflib
 import os
 import sys
 import warnings
@@ -12,8 +13,10 @@ from pydantic import Field, SkipValidation, model_validator
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.compatibility import FileType
+from pydantic_settings_export.exceptions import ExportWarning
 from pydantic_settings_export.exporter import Exporter
 from pydantic_settings_export.generators import AbstractGenerator
+from pydantic_settings_export.generators.abstract import FileChange
 from pydantic_settings_export.generators.simple import SimpleGenerator
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
@@ -136,14 +139,14 @@ class PSECLISettings(PSESettings):
             for gen_config in gen_configs:
                 g = all_generators.get(name)
                 if not g:
-                    warnings.warn(f"Generator {name!r} not found", stacklevel=2)
+                    warnings.warn(f"Generator {name!r} not found", ExportWarning, stacklevel=2)
                     continue
                 if not gen_config:
                     continue
                 try:
                     result.append(g(self, gen_config))
                 except Exception as e:
-                    warnings.warn(f"Failed to initialize generator {name!r}: {e}", stacklevel=2)
+                    warnings.warn(f"Failed to initialize generator {name!r}: {e}", ExportWarning, stacklevel=2)
                     continue
         return result
 
@@ -297,6 +300,15 @@ def make_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Do not write any files. Print a diff of files that are missing or out of date "
+            "and exit with code 1 if there are any. Useful for CI."
+        ),
+    )
+
+    parser.add_argument(
         "settings",
         nargs="*",
         help=(
@@ -325,6 +337,72 @@ def _load_env_files(env_files: Iterable[TextIO]) -> None:
             warnings.warn(f"Failed to read environment file {env_file.name}: {e}", stacklevel=2)
         except Exception as e:
             warnings.warn(f"Unexpected error loading environment file {env_file.name}: {e}", stacklevel=2)
+
+
+def _display_path(path: Path) -> str:
+    """Get a path relative to the current directory if possible.
+
+    :param path: The path to display.
+    :return: The relative path, or the original path if it is outside the current directory.
+    """
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _format_diff(change: FileChange) -> str:
+    """Format a file change as a unified diff.
+
+    :param change: The file change.
+    :return: The unified diff.
+    """
+    name = _display_path(change.path)
+    old_name, new_name = (name, name) if Path(name).is_absolute() else (f"a/{name}", f"b/{name}")
+    old_lines = (change.old_content or "").splitlines(keepends=True)
+    new_lines = change.new_content.splitlines(keepends=True)
+    diff = difflib.unified_diff(
+        old_lines,
+        new_lines,
+        fromfile="/dev/null" if change.old_content is None else old_name,
+        tofile=new_name,
+    )
+    # A line without a trailing newline is the last line of a file: terminate it and mark it like `git diff` does.
+    return "".join(line if line.endswith("\n") else f"{line}\n\\ No newline at end of file\n" for line in diff)
+
+
+def _check(
+    parser: argparse.ArgumentParser, s: PSECLISettings, settings: list[BaseSettings | type[BaseSettings]]
+) -> None:
+    """Print the diff of files that are out of date and exit with code 1 if there are any or if the check failed.
+
+    Export problems that are only warnings during a normal run (a generator that fails to initialize or run,
+    unimportable settings, an unreadable file) make the check fail, because the affected files could not be verified.
+
+    :param parser: The argument parser used to exit.
+    :param s: The CLI settings with the generators configuration.
+    :param settings: The settings to check.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        changes = Exporter(s, s.get_generators()).changes_all(*settings)
+    for w in caught:
+        # Re-emit with the user's filters, since recording used the 'always' filter.
+        warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+    errors = [str(w.message) for w in caught if issubclass(w.category, ExportWarning)]
+
+    for change in changes:
+        sys.stdout.write(_format_diff(change))
+    if changes:
+        files = "\n".join(f"- {_display_path(c.path)}" for c in changes)
+        print(f"\nFiles out of date ({len(changes)}):\n{files}", flush=True)
+    if errors:
+        problems = "\n".join(f"- {e}" for e in errors)
+        print(f"\nCheck failed, some files could not be verified ({len(errors)}):\n{problems}", flush=True)
+    if changes or errors:
+        parser.exit(1)
+    print("All files are up to date.")
+    parser.exit(0)
 
 
 def _setup_settings(
@@ -365,6 +443,32 @@ def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) ->
             continue
         result.append(g)
     return result
+
+
+def _export(
+    parser: argparse.ArgumentParser,
+    s: PSECLISettings,
+    settings: list[BaseSettings | type[BaseSettings]],
+    check: bool = False,
+) -> None:
+    """Run the exporter (or only check files if *check* is set) and exit.
+
+    :param parser: The argument parser used to exit.
+    :param s: The CLI settings with the generators configuration.
+    :param settings: The settings to export.
+    :param check: Only check that files are up to date, without writing them.
+    """
+    try:
+        if check:
+            _check(parser, s, settings)
+        result = Exporter(s, s.get_generators()).run_all(*settings)
+    except Exception as e:
+        parser.exit(2, f"Failed to initialize exporter: [{e.__class__.__name__}] {e}\n")
+
+    if result:
+        files = "\n".join(f"- {r}" for r in result)
+        parser.exit(0, f"Generated files ({len(result)}): \n{files}\n")
+    parser.exit(0, "No files generated.\n")
 
 
 def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
@@ -411,16 +515,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
 
     # Run main settings export
-    exporter = Exporter(s, s.get_generators())
-    try:
-        result = exporter.run_all(*settings)
-    except Exception as e:
-        parser.exit(2, f"Failed to initialize exporter: [{e.__class__.__name__}] {e}\n")
-
-    if result:
-        files = "\n".join(f"- {r}" for r in result)
-        parser.exit(0, f"Generated files ({len(result)}): \n{files}\n")
-    parser.exit(0, "No files generated.\n")
+    _export(parser, s, settings, check=args.check)
 
 
 if __name__ == "__main__":
