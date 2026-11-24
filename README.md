@@ -149,7 +149,9 @@ pydantic-settings-export --check
 CLI options override environment variables and `pyproject.toml`.
 
 With `--check`, nothing is written: a unified diff of every missing or outdated file is printed, and the command
-exits with code `1` if there is at least one, or `0` if everything is up to date.
+exits with code `1` if there is at least one, or `0` if everything is up to date. Problems that are only warnings
+during a normal run (a failed generator, settings that cannot be imported, a missing Markdown region file) also make
+the check fail, since those files could not be verified.
 
 ## Configuration
 
@@ -291,7 +293,8 @@ venv = "auto"
 Detection order for `"auto"` is `./venv`, `./.venv`, uv, then Poetry.
 
 Use the `pydantic-settings-export-check` hook instead to fail on outdated files without regenerating them,
-for example in CI:
+for example in CI. It runs on every commit, because changing only generated files or the configuration can make
+them out of date:
 
 ```yaml
       - id: pydantic-settings-export-check

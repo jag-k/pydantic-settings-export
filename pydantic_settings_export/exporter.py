@@ -6,6 +6,7 @@ from typing import TypeVar
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 
+from pydantic_settings_export.exceptions import ExportWarning
 from pydantic_settings_export.generators.abstract import AbstractGenerator, FileChange
 from pydantic_settings_export.models import SettingsInfoModel
 from pydantic_settings_export.settings import PSESettings
@@ -59,7 +60,7 @@ class Exporter:
                 try:
                     result.extend(import_settings_from_string(string))
                 except (ImportError, ValueError, ValidationError) as e:
-                    warnings.warn(f"Failed to import settings {string!r}: {e}", stacklevel=4)
+                    warnings.warn(f"Failed to import settings {string!r}: {e}", ExportWarning, stacklevel=4)
             return result
 
         default_infos = [_parse(s) for s in settings]
@@ -76,7 +77,7 @@ class Exporter:
 
                 yield from action(generator, gen_infos)
             except Exception as e:
-                warnings.warn(f"Generator {generator.__class__.__name__} failed: {e}", stacklevel=3)
+                warnings.warn(f"Generator {generator.__class__.__name__} failed: {e}", ExportWarning, stacklevel=3)
 
     def run_all(self, *settings: BaseSettings | type[BaseSettings]) -> list[Path]:
         """Run all generators for the given settings.

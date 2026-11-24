@@ -231,3 +231,29 @@ def test_overriding_changes_does_not_warn(file_paths_gen: type[AbstractGenerator
 
             def changes(self, *settings_info):  # type: ignore[override]
                 return []
+
+
+def test_run_continues_after_unwritable_file(
+    file_paths_gen: type[AbstractGenerator],
+    tmp_path: Path,
+) -> None:  # type: ignore[type-arg]
+    """One file that cannot be written must not stop the other files from being written."""
+    from pydantic_settings_export.exceptions import ExportWarning
+    from pydantic_settings_export.models import SettingsInfoModel
+
+    class _Gen(file_paths_gen):  # type: ignore[valid-type,misc]
+        name = "_test_unwritable_gen"
+
+        def generate_single(self, settings_info, level: int = 1) -> str:  # type: ignore[override]
+            return "content"
+
+    unwritable = tmp_path / "is_a_dir"
+    unwritable.mkdir()
+    writable = tmp_path / "ok.txt"
+    gen = _Gen(generator_config=file_paths_gen.config(paths=[unwritable, writable], per_settings=False))
+
+    with pytest.warns(ExportWarning, match="Failed to write"):
+        written = gen.run(SettingsInfoModel(name="A", fields=[]))
+
+    assert written == [writable]
+    assert writable.read_text(encoding="utf-8") == "content\n"

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal, TypedDict, cast
 
 from pydantic import ConfigDict, Field, model_validator
 
+from pydantic_settings_export.exceptions import ExportWarning
 from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, format_types, value_repr
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
@@ -315,7 +316,7 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
             try:
                 change = self._region_change(path, constructor)
             except (OSError, FileNotFoundError) as e:
-                warnings.warn(str(e), stacklevel=2)
+                warnings.warn(str(e), ExportWarning, stacklevel=2)
                 continue
             if change is not None:
                 changes.append(change)

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeAlias, TypeVar, ca
 
 from pydantic import BaseModel, Field, create_model
 
+from pydantic_settings_export.exceptions import ExportWarning
 from pydantic_settings_export.settings import PSESettings
 
 if TYPE_CHECKING:
@@ -218,10 +219,16 @@ class AbstractGenerator(ABC, Generic[C]):
         :param settings_info: The settings info to generate documentation for.
         :return: The list of file paths is written to.
         """
-        changes = self.changes(*settings_info)
-        for change in changes:
-            change.apply()
-        return [change.path for change in changes]
+        written: list[Path] = []
+        for change in self.changes(*settings_info):
+            try:
+                change.apply()
+            except OSError as e:
+                # Keep writing other files; one unwritable file must not block the rest.
+                warnings.warn(f"Failed to write {change.path}: {e}", ExportWarning, stacklevel=2)
+                continue
+            written.append(change.path)
+        return written
 
     @staticmethod
     @final

@@ -401,3 +401,36 @@ def test_main_check_reports_missing_and_outdated_files(
     assert "\n-Old default:" in stdout
     assert "\n+Default:" in stdout
     assert out.read_text(encoding="utf-8") != generated
+
+
+def test_format_diff_marks_missing_newline_at_end_of_file(tmp_path: Path) -> None:
+    """Lines without a trailing newline must not run together with the next diff line."""
+    from pydantic_settings_export.cli import _format_diff
+    from pydantic_settings_export.generators.abstract import FileChange
+
+    diff = _format_diff(FileChange(tmp_path / "f.txt", "old", "new\n"))
+
+    assert "-old\n\\ No newline at end of file\n+new\n" in diff
+    assert diff.endswith("\n")
+
+
+def test_main_check_fails_when_files_cannot_be_verified(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must fail, not report success, when a configured file cannot be checked."""
+    pytest.importorskip("text_region_parser")
+    monkeypatch.chdir(tmp_path)
+    missing = tmp_path / "missing.md"
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        f'[[tool.pydantic_settings_export.generators.markdown]]\npaths = [{str(missing)!r}]\nregion = "config"\n'
+    )
+
+    with pytest.warns(UserWarning, match="does not exist"):
+        assert _run_main(config_file, tmp_path, "--check") == 1
+
+    stdout = capsys.readouterr().out
+    assert "Check failed, some files could not be verified (1):" in stdout
+    assert "All files are up to date." not in stdout
