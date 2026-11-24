@@ -57,7 +57,7 @@ BASE_SETTINGS_DOCS = (getdoc(BaseSettings) or "").strip()
 BASE_MODEL_DOCS = (getdoc(BaseModel) or "").strip()
 
 
-def to_python_jsonable(value: Any, value_type: type | None = None) -> Any:
+def to_python_jsonable(value: Any, value_type: Any = None) -> Any:
     """Convert *value* to a JSON-serialisable Python object (not a string).
 
     Pydantic serialisation (``dump_python(mode="json")``) is used so that
@@ -77,7 +77,7 @@ def to_python_jsonable(value: Any, value_type: type | None = None) -> Any:
         return str(value)
 
 
-def value_to_jsonable(value: Any, value_type: type | None = None) -> str:
+def value_to_jsonable(value: Any, value_type: Any = None) -> str:
     """Convert *value* to a JSON string.
 
     Thin wrapper around :func:`to_python_jsonable` followed by
@@ -125,7 +125,7 @@ def _is_secret_annotation(annotation: Any) -> bool:
     return isclass(cls) and issubclass(cls, (SecretStr, SecretBytes, Secret))
 
 
-def _prepare_example(example: Any, value_type: type | None = None) -> Any:
+def _prepare_example(example: Any, value_type: Any = None) -> Any:
     """Prepare the example for the field."""
     if isinstance(example, set):
         example = sorted(example)
