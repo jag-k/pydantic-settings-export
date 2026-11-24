@@ -74,10 +74,12 @@ The output is only as good as the models:
 
 - Give every field `Field(description=...)`. A class docstring becomes the section description.
 - Add `Field(examples=[...])` for non-obvious values such as URLs, DSNs, lists, or enums.
-- Never put real secrets in defaults or `examples`: generated files are meant to be committed. Only defaults built
-  as `SecretStr("...")` are masked as `**********`; a plain string default on a `SecretStr` field
-  (`token: SecretStr = "..."`) and every value in `examples` are written as is. Prefer no default (required) or an
-  obvious placeholder.
+- Type secrets as `SecretStr` / `SecretBytes` / `Secret[...]`: their defaults are rendered as `**********`.
+  Older versions mask only defaults built as `SecretStr("...")` and print a plain default (`token: SecretStr = "..."`)
+  as is; check the generated output.
+- Never put real secrets in defaults or `examples`: generated files are meant to be committed, and `examples` are
+  always written as is (use them for a format hint such as `"sk-..."`). Prefer no default (required) or an obvious
+  placeholder.
 - Hide internal fields with `Field(exclude=True)`. It is respected by default (`respect_exclude = true`).
 - Mark old fields with `Field(deprecated=...)`; they are flagged in the output.
 - `env_prefix`, `env_nested_delimiter`, aliases, `case_sensitive`, and nested models are reflected in the generated

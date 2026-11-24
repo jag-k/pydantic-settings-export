@@ -517,3 +517,48 @@ def test_settings_info_from_instance() -> None:
 
     assert result.name == "Settings"
     assert len(result.fields) == 1
+
+
+# =============================================================================
+# Secret defaults
+# =============================================================================
+
+
+def test_secret_defaults_are_masked_by_field_type() -> None:
+    """Defaults of secret-typed fields are masked even when the default is a plain value."""
+    from typing import Annotated
+
+    from pydantic import Secret, SecretBytes
+
+    class Settings(BaseSettings):
+        raw_str: SecretStr = Field(default="raw-secret")  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        wrapped: SecretStr = Field(default=SecretStr("wrapped-secret"))
+        optional_raw: Optional[SecretStr] = Field(default="optional-secret")  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        union_raw: Union[SecretStr, None] = "union-secret"  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        annotated_raw: Annotated[SecretStr, Field(description="x")] = "annotated-secret"  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        raw_bytes: SecretBytes = Field(default=b"bytes-secret")  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        generic_raw: Secret[int] = Field(default=12345)  # type: ignore[assignment]  # ty: ignore[invalid-assignment]
+        factory_raw: SecretStr = Field(default_factory=lambda: "factory-secret")  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+
+    for name, field in Settings.model_fields.items():
+        result = FieldInfoModel.from_settings_field(name, field)
+        assert result.default == "**********", name
+        assert result.examples == ["**********"], name
+
+
+def test_secret_fields_keep_none_required_and_explicit_examples() -> None:
+    """None defaults, required secrets and explicit examples are not masked."""
+
+    class Settings(BaseSettings):
+        optional_none: Optional[SecretStr] = None
+        required: SecretStr
+        with_example: SecretStr = Field(default=SecretStr("x"), examples=["sk-..."])
+        plain_value: str = "plain"
+
+    fields = Settings.model_fields
+    assert FieldInfoModel.from_settings_field("optional_none", fields["optional_none"]).default is None
+    required = FieldInfoModel.from_settings_field("required", fields["required"])
+    assert required.is_required
+    assert required.default is None
+    assert FieldInfoModel.from_settings_field("with_example", fields["with_example"]).examples == ["sk-..."]
+    assert FieldInfoModel.from_settings_field("plain_value", fields["plain_value"]).default == "plain"

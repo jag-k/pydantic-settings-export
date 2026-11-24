@@ -35,6 +35,7 @@ The exporter understands:
 
 - `Field(description=...)`, `Field(examples=...)`, aliases, deprecation markers, defaults, and required fields.
 - `env_prefix`, `env_nested_delimiter`, `case_sensitive`, nested settings models, and `populate_by_name`.
+- secret types (`SecretStr`, `SecretBytes`, `Secret[...]`): defaults are rendered as `**********`.
 - settings classes, settings instances, or a whole module containing `BaseSettings` subclasses.
 - generator-specific `settings` and `extend_settings` overrides when different outputs need different settings models.
 
