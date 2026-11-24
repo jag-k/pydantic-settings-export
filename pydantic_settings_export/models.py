@@ -90,7 +90,7 @@ def value_repr(v: Any) -> str:
     :return: Compact JSON string, e.g. ``'"hello"'``, ``'42'``, ``'true'``,
         ``'null'``, ``'["a","b"]'``.
     """
-    return json.dumps(v, separators=(",", ":"))
+    return json.dumps(v, separators=(",", ":"), ensure_ascii=False)
 
 
 def _prepare_example(example: Any, value_type: type | None = None) -> Any:
