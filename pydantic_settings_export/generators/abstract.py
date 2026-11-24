@@ -176,12 +176,12 @@ class AbstractGenerator(ABC, Generic[C]):
         updated_files: list[Path] = []
         result = self.generate(*settings_info)
         for path in self.file_paths():
-            if path.is_file() and path.read_text() == result:
+            if path.is_file() and path.read_text(encoding="utf-8") == result:
                 # No need to update the file
                 continue
 
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(result)
+            path.write_text(result, encoding="utf-8")
             updated_files.append(path)
         return updated_files
 

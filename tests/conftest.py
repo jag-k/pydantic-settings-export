@@ -101,3 +101,27 @@ def full_settings() -> type[BaseSettings]:
         api: APISettings = Field(default_factory=APISettings)
 
     return Settings
+
+
+@pytest.fixture
+def cp1252_default_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Emulate a platform whose default file encoding is not UTF-8 (e.g. Windows with cp1252)."""
+    from pathlib import Path
+
+    original_read_text = Path.read_text
+    original_write_text = Path.write_text
+
+    def read_text(self: Path, encoding: str | None = None, errors: str | None = None) -> str:
+        return original_read_text(self, encoding=encoding or "cp1252", errors=errors)
+
+    def write_text(
+        self: Path,
+        data: str,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> int:
+        return original_write_text(self, data, encoding=encoding or "cp1252", errors=errors, newline=newline)
+
+    monkeypatch.setattr(Path, "read_text", read_text)
+    monkeypatch.setattr(Path, "write_text", write_text)
