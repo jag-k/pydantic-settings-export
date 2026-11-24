@@ -6,7 +6,7 @@
   files: \.py$
   args: [ ]
   pass_filenames: false
-  additional_dependencies: [ ]
+  additional_dependencies: [ '.[all]' ]
   stages: [ pre-commit ]
 - id: pydantic-settings-export-check
   name: pydantic-settings-export (check)
@@ -17,5 +17,5 @@
   always_run: true
   args: [ ]
   pass_filenames: false
-  additional_dependencies: [ ]
+  additional_dependencies: [ '.[all]' ]
   stages: [ pre-commit ]

@@ -279,8 +279,16 @@ repos:
     hooks:
       - id: pydantic-settings-export
         files: ^app/settings\.py$
+```
+
+The hooks install all extras (`email`, `regions`, `toml`) by default. Setting `additional_dependencies` replaces that
+default, so keep `.[all]` (or the extras you need) in the list when adding your own packages:
+
+```yaml
+      - id: pydantic-settings-export
         additional_dependencies:
-          - pydantic-settings-export[email,regions,toml]
+          - .[all]
+          - my-private-package
 ```
 
 When the hook needs to import packages from your project, configure venv discovery:
