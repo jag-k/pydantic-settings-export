@@ -16,6 +16,7 @@
 [![Pepy - Total Downloads](https://img.shields.io/pepy/dt/pydantic-settings-export)][pypi]
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pydantic-settings-export)][pypi]
 [![PyPI - License](https://img.shields.io/pypi/l/pydantic-settings-export)][license]
+[![skills.sh](https://skills.sh/b/jag-k/pydantic-settings-export)](https://skills.sh/jag-k/pydantic-settings-export)
 
 Generate documentation and example config files from [pydantic-settings] models.
 
@@ -35,6 +36,7 @@ The exporter understands:
 
 - `Field(description=...)`, `Field(examples=...)`, aliases, deprecation markers, defaults, and required fields.
 - `env_prefix`, `env_nested_delimiter`, `case_sensitive`, nested settings models, and `populate_by_name`.
+- secret types (`SecretStr`, `SecretBytes`, `Secret[...]`): defaults are rendered as `**********`.
 - settings classes, settings instances, or a whole module containing `BaseSettings` subclasses.
 - generator-specific `settings` and `extend_settings` overrides when different outputs need different settings models.
 
@@ -306,6 +308,16 @@ them out of date:
 
 ```yaml
       - id: pydantic-settings-export-check
+```
+
+## Agent Skill
+
+The repository ships an [Agent Skill](skills/pydantic-settings-export/SKILL.md) that teaches coding agents (Claude Code,
+Codex, Cursor, and others) to set up `pydantic-settings-export`, write settings that document well, keep generated
+files in sync, and troubleshoot common errors:
+
+```bash
+npx skills add jag-k/pydantic-settings-export
 ```
 
 ## Python API

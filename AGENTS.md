@@ -16,7 +16,7 @@ uv run pse --check            # examples/ and README regions are up to date (exi
 - If hooks modified files (ruff format, ssort, `pse`), re-stage and run again.
 - If you changed `PSESettings`, a generator config, or output format: run `uv run pse` and commit the regenerated
   `examples/` and README regions.
-- Behavior change in CLI, config, or hooks: update `README.md`.
+- Behavior change in CLI, config, or hooks: update `README.md` and `skills/pydantic-settings-export/SKILL.md`.
 - First setup: `uv sync --all-extras --dev --group tests`. Other Python: add `--python 3.13 --all-extras`.
 
 ## Where things are
@@ -31,6 +31,7 @@ uv run pse --check            # examples/ and README regions are up to date (exi
 | `pydantic_settings_export/exceptions.py`     | `ExportWarning`                                                                            |
 | `pydantic_settings_export/venv.py`           | finds the user's venv (`venv = "auto"`) so their settings can be imported                  |
 | `tests/`, `tests/generators/`                | pytest; shared fixtures in `tests/conftest.py`                                             |
+| `skills/pydantic-settings-export/`           | Agent Skill for *users* of the library (`npx skills add jag-k/pydantic-settings-export`)   |
 | `prek.toml`                                  | local + CI hooks (do not add `.pre-commit-config.yaml`)                                    |
 | `.pre-commit-hooks.yaml`                     | hooks published for *other* projects; installs `.[all]` by default                         |
 

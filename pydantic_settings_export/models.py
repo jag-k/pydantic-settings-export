@@ -5,9 +5,20 @@ import warnings
 from inspect import getdoc, isclass
 from pathlib import Path
 from types import GenericAlias
-from typing import TYPE_CHECKING, Any, ForwardRef, Literal, TypeVar, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, ForwardRef, Literal, TypeVar, Union, cast, get_args, get_origin
 
-from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, PydanticDeprecationWarning, TypeAdapter
+from pydantic import (
+    AliasChoices,
+    AliasPath,
+    BaseModel,
+    ConfigDict,
+    Field,
+    PydanticDeprecationWarning,
+    Secret,
+    SecretBytes,
+    SecretStr,
+    TypeAdapter,
+)
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticSerializationError, PydanticUndefined
 from pydantic_settings import BaseSettings
@@ -91,6 +102,27 @@ def value_repr(v: Any) -> str:
         ``'null'``, ``'["a","b"]'``.
     """
     return json.dumps(v, separators=(",", ":"), ensure_ascii=False)
+
+
+# How secret values are rendered: the same as Pydantic's JSON serialization of `SecretStr`.
+SECRET_MASK = "**********"  # noqa: S105
+
+
+def _is_secret_annotation(annotation: Any) -> bool:
+    """Check whether a field annotation is a secret type (``SecretStr``, ``SecretBytes``, ``Secret[...]``).
+
+    ``Annotated[...]`` and ``Optional``/``Union`` with a secret member are unwrapped.
+
+    :param annotation: The field annotation.
+    :return: True if values of the field are secrets.
+    """
+    origin = get_origin(annotation)
+    if origin is Annotated:
+        return _is_secret_annotation(get_args(annotation)[0])
+    if origin in UnionTypes:
+        return any(_is_secret_annotation(arg) for arg in get_args(annotation) if arg is not type(None))
+    cls = origin if isclass(origin) else annotation
+    return isclass(cls) and issubclass(cls, (SecretStr, SecretBytes, Secret))
 
 
 def _prepare_example(example: Any, value_type: type | None = None) -> Any:
@@ -347,6 +379,11 @@ class FieldInfoModel(BaseModel):
 
         if default is PydanticUndefined:
             return PydanticUndefined
+
+        # The field type says it is a secret: never render its default, even if it is a plain value
+        # (e.g. `token: SecretStr = "..."`), which Pydantic does not wrap into `SecretStr` without `validate_default`.
+        if default is not None and _is_secret_annotation(field.annotation):
+            return SECRET_MASK
 
         if isinstance(default, set):
             default = sorted(default)
