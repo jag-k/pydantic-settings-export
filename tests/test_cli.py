@@ -13,6 +13,18 @@ from pydantic_settings_export.cli import (
     make_parser,
 )
 
+
+@pytest.fixture(autouse=True)
+def _restore_cli_model_config():
+    """``main(["--config-file", ...])`` mutates ``PSECLISettings.model_config``; restore it after each test."""
+    from pydantic_settings_export.cli import PSECLISettings
+
+    snapshot = dict(PSECLISettings.model_config)
+    yield
+    PSECLISettings.model_config.clear()
+    PSECLISettings.model_config.update(snapshot)  # ty: ignore[invalid-argument-type]
+
+
 # =============================================================================
 # Parser creation tests
 # =============================================================================
@@ -460,3 +472,42 @@ def test_main_check_fails_when_generator_cannot_be_initialized(
     stdout = capsys.readouterr().out
     assert "Check failed, some files could not be verified (1):" in stdout
     assert "All files are up to date." not in stdout
+
+
+# Unknown generator names
+# =============================================================================
+
+
+def test_main_errors_on_unknown_generator_name(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A typo in a generator name must be an error, not a silently skipped generator."""
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        "[[tool.pydantic_settings_export.generators.markdwon]]\npaths = ['docs.md']\n"
+        "[[tool.pydantic_settings_export.generators.zzz]]\npaths = ['x.md']\n"
+    )
+
+    with patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")):
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--config-file", str(config_file), "--venv", "", "pydantic_settings_export.settings:PSESettings"])
+
+    assert exc_info.value.code == 2
+    stderr = capsys.readouterr().err
+    assert "Invalid configuration" in stderr
+    assert "Unknown generator 'markdwon'. Did you mean 'markdown'?" in stderr
+    assert "Unknown generator 'zzz'. Available generators:" in stderr
+    assert not (tmp_path / "docs.md").exists()
+
+
+def test_known_generator_names_are_accepted(tmp_path: Path) -> None:
+    """All built-in generator names are valid in the generators configuration."""
+    from pydantic_settings_export.cli import Generators, PSECLISettings
+
+    names = set(Generators.model_fields)
+    assert {"dotenv", "markdown", "simple", "toml"} <= names
+
+    s = PSECLISettings(generators={name: [{"enabled": False}] for name in names})
+
+    assert {name for name, _ in s.generators} == names  # type: ignore[attr-defined]
