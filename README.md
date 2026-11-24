@@ -16,6 +16,7 @@
 [![Pepy - Total Downloads](https://img.shields.io/pepy/dt/pydantic-settings-export)][pypi]
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/pydantic-settings-export)][pypi]
 [![PyPI - License](https://img.shields.io/pypi/l/pydantic-settings-export)][license]
+[![skills.sh](https://skills.sh/b/jag-k/pydantic-settings-export)](https://skills.sh/jag-k/pydantic-settings-export)
 
 Generate documentation and example config files from [pydantic-settings] models.
 
