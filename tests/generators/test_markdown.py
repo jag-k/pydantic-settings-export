@@ -1,3 +1,6 @@
+from pathlib import Path
+
+import pytest
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -328,3 +331,24 @@ def test_markdown_multiple_settings() -> None:
     assert "## Settings2" in result
     assert "Second settings." in result
     assert "`FIELD2`" in result
+
+
+@pytest.mark.usefixtures("cp1252_default_encoding")
+def test_markdown_region_utf8_regardless_of_default_encoding(tmp_path: Path) -> None:
+    """Test region replacement reads and writes UTF-8 even if the platform default encoding is not UTF-8."""
+    pytest.importorskip("text_region_parser")
+
+    class Settings(BaseSettings):
+        title: str = Field(default="Café ✓", description="Заголовок")
+
+    path = tmp_path / "README.md"
+    path.write_bytes("# Документация ✓\n\n<!-- region:config -->\n<!-- endregion:config -->\n".encode())
+    generator = MarkdownGenerator(
+        generator_config=MarkdownSettings(paths=[path], region="config", table_only=True),
+    )
+
+    assert generator.run(SettingsInfoModel.from_settings_model(Settings)) == [path]
+    content = path.read_bytes().decode("utf-8")
+    assert content.startswith("# Документация ✓\n")
+    assert '`"Café ✓"`' in content
+    assert "Заголовок" in content

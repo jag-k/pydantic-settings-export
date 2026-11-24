@@ -181,3 +181,28 @@ def test_run_writes_all_settings_into_file(
     content = (tmp_path / "all.txt").read_text()
     assert "Alpha" in content
     assert "Beta" in content
+
+
+@pytest.mark.usefixtures("cp1252_default_encoding")
+def test_run_writes_and_reads_utf8_regardless_of_default_encoding(
+    file_paths_gen: type[AbstractGenerator],
+    tmp_path: Path,
+) -> None:  # type: ignore[type-arg]
+    from pydantic_settings_export.models import SettingsInfoModel
+
+    class _Utf8Gen(file_paths_gen):  # type: ignore[valid-type,misc]
+        name = "_test_utf8_content_gen"
+
+        def generate_single(self, settings_info, level: int = 1) -> str:  # type: ignore[override]
+            return f"{settings_info.name}: Café ✓"
+
+    gen = _Utf8Gen(
+        settings=PSESettings(root_dir=tmp_path),
+        generator_config=file_paths_gen.config(paths=[Path("out.txt")], per_settings=False),
+    )
+    si = SettingsInfoModel(name="Alpha", fields=[])
+
+    assert gen.run(si) == [tmp_path / "out.txt"]
+    assert (tmp_path / "out.txt").read_bytes().decode("utf-8") == "Alpha: Café ✓\n"
+    # The second run reads the file back and must detect that nothing changed.
+    assert gen.run(si) == []

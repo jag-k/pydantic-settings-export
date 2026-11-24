@@ -212,13 +212,13 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
                     f"Please create this file before running the generator with the `region` option."
                 )
 
-            file_content = path.read_text()
+            file_content = path.read_text(encoding="utf-8")
             new_content = constructor.parse_content(file_content)
 
             if new_content == file_content:
                 return False
 
-            path.write_text(new_content)
+            path.write_text(new_content, encoding="utf-8")
             return True
 
         except OSError as e:
