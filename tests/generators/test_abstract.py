@@ -206,3 +206,28 @@ def test_run_writes_and_reads_utf8_regardless_of_default_encoding(
     assert (tmp_path / "out.txt").read_bytes().decode("utf-8") == "Alpha: Café ✓\n"
     # The second run reads the file back and must detect that nothing changed.
     assert gen.run(si) == []
+
+
+def test_overriding_run_warns(file_paths_gen: type[AbstractGenerator]) -> None:  # type: ignore[type-arg]
+    """Overriding run() bypasses --check, so it must emit a DeprecationWarning pointing to changes()."""
+    with pytest.warns(DeprecationWarning, match=r"overrides `run\(\)`.*Override `changes\(\)` instead"):
+
+        class _RunOverrideGen(file_paths_gen):  # type: ignore[valid-type,misc]
+            name = "_test_run_override_gen"
+
+            def run(self, *settings_info):  # type: ignore[override]  # ty: ignore[override-of-final-method]
+                return []
+
+
+def test_overriding_changes_does_not_warn(file_paths_gen: type[AbstractGenerator]) -> None:  # type: ignore[type-arg]
+    """Overriding changes() is the supported extension point and must not warn."""
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+
+        class _ChangesOverrideGen(file_paths_gen):  # type: ignore[valid-type,misc]
+            name = "_test_changes_override_gen"
+
+            def changes(self, *settings_info):  # type: ignore[override]
+                return []

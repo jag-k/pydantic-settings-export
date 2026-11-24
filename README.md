@@ -339,6 +339,15 @@ app_settings = AppSettings(api_key="secret", debug=True)
 Exporter(settings, generators).run_all(app_settings)
 ```
 
+### Custom Generators
+
+Subclass `AbstractGenerator`, give it a `name` and a `config`, and implement `generate_single()`.
+Pass it to the CLI with `--generator module:Class`.
+
+To customize how files are produced (as the Markdown `region` option does), override `changes()` and return the list
+of `FileChange` objects. `run()` writes exactly these changes, and `--check` compares them, so both stay consistent.
+Do not override `run()`: it is final, `--check` ignores such overrides, and doing so emits a `DeprecationWarning`.
+
 ## Examples
 
 Generated examples in this repository:

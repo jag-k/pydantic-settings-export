@@ -1,4 +1,5 @@
 import inspect
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -124,6 +125,14 @@ class AbstractGenerator(ABC, Generic[C]):
         """Initialize the subclass."""
         check_name = kwargs.pop("check_name", False)
         super().__init_subclass__(**kwargs)
+        if "run" in cls.__dict__:
+            warnings.warn(
+                f"{cls.__qualname__} overrides `run()`, which is ignored by `--check` and will become an error "
+                f"in a future release. Override `changes()` instead: return the list of `FileChange` objects, "
+                f"and `run()` will write them.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if "name" not in cls.__dict__:
             if check_name:
                 raise ValueError("Generator must have a name")
@@ -200,8 +209,11 @@ class AbstractGenerator(ABC, Generic[C]):
                 changes.append(FileChange(path, old_content, result))
         return changes
 
+    @final
     def run(self, *settings_info: SettingsInfoModel) -> list[Path]:
-        """Run the generator.
+        """Run the generator: write all changes computed by :meth:`changes`.
+
+        Do not override this method; override :meth:`changes` instead, so ``--check`` sees the same result.
 
         :param settings_info: The settings info to generate documentation for.
         :return: The list of file paths is written to.
