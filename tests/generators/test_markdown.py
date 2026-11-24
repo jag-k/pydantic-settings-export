@@ -352,3 +352,33 @@ def test_markdown_region_utf8_regardless_of_default_encoding(tmp_path: Path) -> 
     assert content.startswith("# Документация ✓\n")
     assert '`"Café ✓"`' in content
     assert "Заголовок" in content
+
+
+def test_markdown_region_changes_do_not_write(tmp_path: Path) -> None:
+    """Test region changes are computed without writing, and missing files only warn."""
+    pytest.importorskip("text_region_parser")
+
+    class Settings(BaseSettings):
+        title: str = Field(default="value")
+
+    path = tmp_path / "README.md"
+    original = "# Docs\n\n<!-- region:config -->\nold\n<!-- endregion:config -->\n"
+    path.write_text(original, encoding="utf-8")
+    missing = tmp_path / "missing.md"
+    generator = MarkdownGenerator(
+        generator_config=MarkdownSettings(paths=[path, missing], region="config", table_only=True),
+    )
+    info = SettingsInfoModel.from_settings_model(Settings)
+
+    with pytest.warns(UserWarning, match="does not exist"):
+        changes = generator.changes(info)
+
+    assert len(changes) == 1
+    assert changes[0].path == path
+    assert changes[0].old_content == original
+    assert "`TITLE`" in changes[0].new_content
+    assert path.read_text(encoding="utf-8") == original
+
+    changes[0].apply()
+    with pytest.warns(UserWarning, match="does not exist"):
+        assert generator.changes(info) == []

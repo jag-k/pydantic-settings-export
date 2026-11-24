@@ -389,3 +389,47 @@ def test_exporter_caches_settings_info_across_generators(tmp_path: Path) -> None
         exporter.run_all(SharedSettings)
 
     mock_parse.assert_called_once()
+
+
+# =============================================================================
+# changes_all tests
+# =============================================================================
+
+
+def test_exporter_changes_all_does_not_write(simple_settings: type[BaseSettings], tmp_path: Path) -> None:
+    """Test changes_all reports missing and outdated files without writing them."""
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    missing = tmp_path / "missing.txt"
+    outdated = tmp_path / "outdated.txt"
+    outdated.write_text("old\n", encoding="utf-8")
+
+    generator = SimpleGenerator(pse_settings, generator_config=SimpleSettings(paths=[missing, outdated]))
+    exporter = Exporter(settings=pse_settings, generators=[generator])
+
+    changes = exporter.changes_all(simple_settings)
+
+    assert [c.path for c in changes] == [missing, outdated]
+    assert changes[0].old_content is None
+    assert changes[1].old_content == "old\n"
+    assert changes[0].new_content == changes[1].new_content
+    assert not missing.exists()
+    assert outdated.read_text(encoding="utf-8") == "old\n"
+
+    exporter.run_all(simple_settings)
+    assert exporter.changes_all(simple_settings) == []
+
+
+def test_exporter_changes_all_warns_on_generator_failure(simple_settings: type[BaseSettings], tmp_path: Path) -> None:
+    """Test changes_all keeps going when a generator fails, like run_all."""
+    pse_settings = PSESettings(root_dir=tmp_path, project_dir=tmp_path)
+    broken = MagicMock(spec=AbstractGenerator)
+    broken.generator_config = SimpleSettings()
+    broken.changes.side_effect = RuntimeError("boom")
+    output_file = tmp_path / "output.txt"
+    good = SimpleGenerator(pse_settings, generator_config=SimpleSettings(paths=[output_file]))
+    exporter = Exporter(settings=pse_settings, generators=[broken, good])
+
+    with pytest.warns(UserWarning, match="boom"):
+        changes = exporter.changes_all(simple_settings)
+
+    assert [c.path for c in changes] == [output_file]

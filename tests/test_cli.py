@@ -339,3 +339,65 @@ def test_main_exits_when_no_settings_provided(tmp_path: Path) -> None:
             main(["--config-file", str(config_file), "--venv", ""])
 
     assert exc_info.value.code == 1
+
+
+# =============================================================================
+# --check mode
+# =============================================================================
+
+
+def test_parser_check_default() -> None:
+    """Test --check is disabled by default."""
+    assert make_parser().parse_args([]).check is False
+    assert make_parser().parse_args(["--check"]).check is True
+
+
+def _run_main(config_file: Path, tmp_path: Path, *extra: str) -> int | str | None:
+    with patch("pydantic_settings_export.cli.setup_venv_sys_path", return_value=([], "none")):
+        with pytest.raises(SystemExit) as exc_info:
+            main([
+                "--config-file",
+                str(config_file),
+                "--project-dir",
+                str(tmp_path),
+                "--venv",
+                "",
+                *extra,
+                "pydantic_settings_export.settings:PSESettings",
+            ])
+    return exc_info.value.code
+
+
+def test_main_check_reports_missing_and_outdated_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must not write files, print a diff and exit with 1 while files are out of date."""
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "docs" / "settings.txt"
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(f"[[tool.pydantic_settings_export.generators.simple]]\npaths = [{str(out)!r}]\n")
+
+    # Missing file
+    assert _run_main(config_file, tmp_path, "--check") == 1
+    assert not out.exists()
+    stdout = capsys.readouterr().out
+    assert "--- /dev/null\n+++ b/docs/settings.txt\n" in stdout
+    assert "Files out of date (1):\n- docs/settings.txt\n" in stdout
+
+    # Generate and check again
+    assert _run_main(config_file, tmp_path) == 0
+    generated = out.read_text(encoding="utf-8")
+    capsys.readouterr()
+    assert _run_main(config_file, tmp_path, "--check") == 0
+    assert "All files are up to date." in capsys.readouterr().out
+
+    # Outdated file
+    out.write_text(generated.replace("Default:", "Old default:", 1), encoding="utf-8")
+    assert _run_main(config_file, tmp_path, "--check") == 1
+    stdout = capsys.readouterr().out
+    assert "--- a/docs/settings.txt\n+++ b/docs/settings.txt\n" in stdout
+    assert "\n-Old default:" in stdout
+    assert "\n+Default:" in stdout
+    assert out.read_text(encoding="utf-8") != generated

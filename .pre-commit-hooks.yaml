@@ -8,3 +8,13 @@
   pass_filenames: false
   additional_dependencies: [ ]
   stages: [ pre-commit ]
+- id: pydantic-settings-export-check
+  name: pydantic-settings-export (check)
+  description: "Check that files generated from your Pydantic settings are up to date, without writing them."
+  entry: pydantic-settings-export --check
+  language: python
+  files: \.py$
+  args: [ ]
+  pass_filenames: false
+  additional_dependencies: [ ]
+  stages: [ pre-commit ]

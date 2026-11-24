@@ -141,9 +141,15 @@ pydantic-settings-export --generator markdown dotenv -- --help-generators
 
 # Inspect all generator configuration fields
 pydantic-settings-export --help-generators
+
+# Check that generated files are up to date without writing them (for CI)
+pydantic-settings-export --check
 ```
 
 CLI options override environment variables and `pyproject.toml`.
+
+With `--check`, nothing is written: a unified diff of every missing or outdated file is printed, and the command
+exits with code `1` if there is at least one, or `0` if everything is up to date.
 
 ## Configuration
 
@@ -284,6 +290,13 @@ venv = "auto"
 
 Detection order for `"auto"` is `./venv`, `./.venv`, uv, then Poetry.
 
+Use the `pydantic-settings-export-check` hook instead to fail on outdated files without regenerating them,
+for example in CI:
+
+```yaml
+      - id: pydantic-settings-export-check
+```
+
 ## Python API
 
 The API is useful when you need to run exporters from tests, scripts, or a custom workflow.
@@ -313,6 +326,10 @@ generators = [
 ]
 
 updated_files = Exporter(settings, generators).run_all(AppSettings)
+
+# Or only compute what would change, without writing anything
+for change in Exporter(settings, generators).changes_all(AppSettings):
+    print(change.path, "is missing" if change.old_content is None else "is out of date")
 ```
 
 You can pass a settings instance instead of a class when the generated output should include runtime values:

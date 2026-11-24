@@ -10,7 +10,7 @@ from pydantic import ConfigDict, Field, model_validator
 from pydantic_settings_export.models import FieldInfoModel, SettingsInfoModel, format_types, value_repr
 from pydantic_settings_export.utils import make_pretty_md_table_from_dict, q
 
-from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings
+from .abstract import AbstractEnvGenerator, BaseEnvGeneratorSettings, FileChange
 
 if sys.version_info < (3, 11):
     from typing_extensions import Self
@@ -196,14 +196,14 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
         )
 
     @staticmethod
-    def _process_region(path: Path, constructor: "RegionConstructor") -> bool:
-        """Process a single region in a file.
+    def _region_change(path: Path, constructor: "RegionConstructor") -> FileChange | None:
+        """Compute the change of regions in a single file.
 
         :param path: Path to the file
         :param constructor: Region constructor instance
-        :return: True if a file was updated, False otherwise
+        :return: The change, or None if the file is already up to date
         :raises FileNotFoundError: If the file doesn't exist
-        :raises IOError: If there are issues reading/writing the file
+        :raises IOError: If there are issues reading the file
         """
         try:
             if not path.is_file():
@@ -215,14 +215,12 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
             file_content = path.read_text(encoding="utf-8")
             new_content = constructor.parse_content(file_content)
 
-            if new_content == file_content:
-                return False
-
-            path.write_text(new_content, encoding="utf-8")
-            return True
-
         except OSError as e:
             raise OSError(f"Failed to process region in {path}: {e}") from e
+
+        if new_content == file_content:
+            return None
+        return FileChange(path, file_content, new_content)
 
     def generate_single(self, settings_info: SettingsInfoModel, level: int = 1) -> str:  # noqa: C901
         """Generate Markdown documentation for a pydantic settings class.
@@ -291,21 +289,20 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
             content += "\n\n".join(self.generate_single(s, 2).strip() for s in settings_infos)
         return content.strip() + "\n"
 
-    def run(self, *settings_info: SettingsInfoModel) -> list[Path]:
-        """Run the generator.
+    def changes(self, *settings_info: SettingsInfoModel) -> list[FileChange]:
+        """Compute the changes to generated files without writing them.
 
         :param settings_info: The settings info to generate documentation for.
-        :return: The paths to generated documentation.
+        :return: The changes for files whose content differs from the generated one.
         """
-        # If the region is not set, run the generator as usual
+        # If the region is not set, compute changes as usual
         region = self.generator_config.region
         if not region:
-            return super().run(*settings_info)
+            return super().changes(*settings_info)
 
         import text_region_parser
 
         result = f"\n{self.generate(*settings_info).strip()}\n"
-        file_paths = self.file_paths()
 
         constructor = text_region_parser.RegionConstructor()
 
@@ -313,12 +310,14 @@ class MarkdownGenerator(AbstractEnvGenerator[MarkdownSettings]):
         # This region will be replaced with the generated content
         constructor.add_parser(cast(str, region))(lambda _: result)
 
-        updated_files: list[Path] = []
-        for path in file_paths:
+        changes: list[FileChange] = []
+        for path in self.file_paths():
             try:
-                if self._process_region(path, constructor):
-                    updated_files.append(path)
+                change = self._region_change(path, constructor)
             except (OSError, FileNotFoundError) as e:
                 warnings.warn(str(e), stacklevel=2)
+                continue
+            if change is not None:
+                changes.append(change)
 
-        return updated_files
+        return changes
