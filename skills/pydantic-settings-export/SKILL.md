@@ -27,9 +27,12 @@ Ask the tool about the installed version instead of guessing:
 
 ## Set up in a project
 
-1. **Find the settings.** Search for `BaseSettings` subclasses. Prefer pointing at classes (`app.settings:Settings`)
-   or a module (`app.settings`, which picks up every `BaseSettings` subclass defined in it). Avoid a module-level
-   instance such as `settings = Settings()`: importing it requires the real environment variables.
+1. **Find the settings.** Search for `BaseSettings` subclasses. Point at classes (`app.settings:Settings`) or a
+   module (`app.settings`, which picks up every `BaseSettings` subclass defined in it). The whole module is imported
+   either way, so if it creates an instance at import time (`settings = Settings()`) and some required fields have no
+   value, the import fails even when you point at the class. Then either provide values (`env_file` /
+   `--env-file` with dummy values) or move instance creation out of that module or make it lazy
+   (e.g. `@lru_cache def get_settings() -> Settings`).
 2. **Pick generators and extras** from what the project already uses:
 
    | Output                                   | Generator  | Extra needed                                  |
@@ -71,7 +74,10 @@ The output is only as good as the models:
 
 - Give every field `Field(description=...)`. A class docstring becomes the section description.
 - Add `Field(examples=[...])` for non-obvious values such as URLs, DSNs, lists, or enums.
-- Use `SecretStr` for secrets: the output shows `**********`, not the default.
+- Never put real secrets in defaults or `examples`: generated files are meant to be committed. Only defaults built
+  as `SecretStr("...")` are masked as `**********`; a plain string default on a `SecretStr` field
+  (`token: SecretStr = "..."`) and every value in `examples` are written as is. Prefer no default (required) or an
+  obvious placeholder.
 - Hide internal fields with `Field(exclude=True)`. It is respected by default (`respect_exclude = true`).
 - Mark old fields with `Field(deprecated=...)`; they are flagged in the output.
 - `env_prefix`, `env_nested_delimiter`, aliases, `case_sensitive`, and nested models are reflected in the generated
@@ -106,7 +112,7 @@ The output is only as good as the models:
 
 | Symptom                                                     | Cause and fix                                                                                                                                                         |
 |-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `You have N missing settings ... set this required ENV Vars` | A module-level `Settings()` instance is created on import. Point at the class instead, or load values with `env_file = ".env"` / `--env-file` (dummy values in CI).    |
+| `You have N missing settings ... set this required ENV Vars` | The imported module creates a `Settings()` instance at import time (pointing at the class does not help, the module still runs). Provide values with `env_file = ".env"` / `--env-file` (dummy values in CI), or move instance creation to another module or make it lazy. |
 | `ModuleNotFoundError` while importing settings              | Wrong `project_dir`, or the project's dependencies are not importable. Run through the project env (`uv run pse`) or set `venv` (`"auto"`, `"uv"`, `"poetry"`, path). |
 | `The region option is only available if the regions extra is installed` | Install `pydantic-settings-export[regions]` (in a hook: keep `.[all]` in `additional_dependencies`).                                                  |
 | TOML generator missing or failing                           | Install the `toml` extra.                                                                                                                                             |
