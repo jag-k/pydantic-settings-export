@@ -5,7 +5,7 @@ docs and example files: Markdown, `.env`, TOML, plain text. Python 3.10+, manage
 
 ## Before you finish
 
-Run these; CI runs the same (tests on Python 3.10-3.14):
+Run these; CI runs the same (tests on Python 3.10-3.15):
 
 ```bash
 uv run --group tests pytest   # `pytest` is in the `tests` group: plain `uv run pytest` fails to spawn
