@@ -1,0 +1,6 @@
+interface:
+  display_name: "Pydantic Settings Export"
+  short_description: "Document pydantic-settings models as Markdown, .env.example and TOML, and keep them in sync"
+  default_prompt: "Use $pydantic-settings-export to document this project's settings and keep the generated files up to date."
+policy:
+  allow_implicit_invocation: true

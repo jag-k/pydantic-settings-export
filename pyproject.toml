@@ -262,6 +262,7 @@ mode = "all"
 [[tool.pydantic_settings_export.generators.toml]]
 paths = [
     "examples/pyproject.example.toml",
+    "skills/pydantic-settings-export/references/pyproject.example.toml",
 ]
 prefix = "tool.pydantic_settings_export"
 comment_defaults = true

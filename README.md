@@ -308,6 +308,16 @@ them out of date:
       - id: pydantic-settings-export-check
 ```
 
+## Agent Skill
+
+The repository ships an [Agent Skill](skills/pydantic-settings-export/SKILL.md) that teaches coding agents (Claude Code,
+Codex, Cursor, and others) to set up `pydantic-settings-export`, write settings that document well, keep generated
+files in sync, and troubleshoot common errors:
+
+```bash
+npx skills add jag-k/pydantic-settings-export
+```
+
 ## Python API
 
 The API is useful when you need to run exporters from tests, scripts, or a custom workflow.
