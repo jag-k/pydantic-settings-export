@@ -434,3 +434,29 @@ def test_main_check_fails_when_files_cannot_be_verified(
     stdout = capsys.readouterr().out
     assert "Check failed, some files could not be verified (1):" in stdout
     assert "All files are up to date." not in stdout
+
+
+def test_main_check_fails_when_generator_cannot_be_initialized(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """--check must fail when a configured generator is dropped because it failed to initialize."""
+    from pydantic_settings_export.exceptions import ExportWarning
+    from pydantic_settings_export.generators.simple import SimpleGenerator
+
+    monkeypatch.chdir(tmp_path)
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text("[[tool.pydantic_settings_export.generators.simple]]\npaths = ['out.txt']\n")
+
+    def _broken_init(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("broken generator")
+
+    monkeypatch.setattr(SimpleGenerator, "__init__", _broken_init)
+
+    with pytest.warns(ExportWarning, match="broken generator"):
+        assert _run_main(config_file, tmp_path, "--check") == 1
+
+    stdout = capsys.readouterr().out
+    assert "Check failed, some files could not be verified (1):" in stdout
+    assert "All files are up to date." not in stdout

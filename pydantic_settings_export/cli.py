@@ -139,14 +139,14 @@ class PSECLISettings(PSESettings):
             for gen_config in gen_configs:
                 g = all_generators.get(name)
                 if not g:
-                    warnings.warn(f"Generator {name!r} not found", stacklevel=2)
+                    warnings.warn(f"Generator {name!r} not found", ExportWarning, stacklevel=2)
                     continue
                 if not gen_config:
                     continue
                 try:
                     result.append(g(self, gen_config))
                 except Exception as e:
-                    warnings.warn(f"Failed to initialize generator {name!r}: {e}", stacklevel=2)
+                    warnings.warn(f"Failed to initialize generator {name!r}: {e}", ExportWarning, stacklevel=2)
                     continue
         return result
 
@@ -372,20 +372,20 @@ def _format_diff(change: FileChange) -> str:
 
 
 def _check(
-    parser: argparse.ArgumentParser, exporter: Exporter, settings: list[BaseSettings | type[BaseSettings]]
+    parser: argparse.ArgumentParser, s: PSECLISettings, settings: list[BaseSettings | type[BaseSettings]]
 ) -> None:
     """Print the diff of files that are out of date and exit with code 1 if there are any or if the check failed.
 
-    Export problems that are only warnings during a normal run (a failed generator, unimportable settings,
-    an unreadable file) make the check fail, because the affected files could not be verified.
+    Export problems that are only warnings during a normal run (a generator that fails to initialize or run,
+    unimportable settings, an unreadable file) make the check fail, because the affected files could not be verified.
 
     :param parser: The argument parser used to exit.
-    :param exporter: The exporter to check.
+    :param s: The CLI settings with the generators configuration.
     :param settings: The settings to check.
     """
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        changes = exporter.changes_all(*settings)
+        changes = Exporter(s, s.get_generators()).changes_all(*settings)
     for w in caught:
         # Re-emit with the user's filters, since recording used the 'always' filter.
         warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
@@ -447,21 +447,21 @@ def _process_generators(generators: Sequence[type[AbstractGenerator] | None]) ->
 
 def _export(
     parser: argparse.ArgumentParser,
-    exporter: Exporter,
+    s: PSECLISettings,
     settings: list[BaseSettings | type[BaseSettings]],
     check: bool = False,
 ) -> None:
     """Run the exporter (or only check files if *check* is set) and exit.
 
     :param parser: The argument parser used to exit.
-    :param exporter: The exporter to run.
+    :param s: The CLI settings with the generators configuration.
     :param settings: The settings to export.
     :param check: Only check that files are up to date, without writing them.
     """
     try:
         if check:
-            _check(parser, exporter, settings)
-        result = exporter.run_all(*settings)
+            _check(parser, s, settings)
+        result = Exporter(s, s.get_generators()).run_all(*settings)
     except Exception as e:
         parser.exit(2, f"Failed to initialize exporter: [{e.__class__.__name__}] {e}\n")
 
@@ -515,7 +515,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     print(f"Loaded settings ({len(settings)}):\n\n{names}\n")
 
     # Run main settings export
-    _export(parser, Exporter(s, s.get_generators()), settings, check=args.check)
+    _export(parser, s, settings, check=args.check)
 
 
 if __name__ == "__main__":
