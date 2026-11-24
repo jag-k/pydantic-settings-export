@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, TextIO, cast
 
 from dotenv import dotenv_values, load_dotenv
-from pydantic import Field, SkipValidation, model_validator
+from pydantic import Field, SkipValidation, ValidationError, model_validator
 from pydantic_settings import BaseSettings
 
 from pydantic_settings_export.compatibility import FileType
@@ -53,6 +53,29 @@ def _make_project_name(default_name: str) -> str:
 
 PROJECT_NAME: str = _make_project_name("pydantic-settings-export")
 Generators = AbstractGenerator.create_generator_config_model(multiple_for_single=True)
+
+
+def _check_unknown_generators(generators: Any) -> None:
+    """Raise an error if the generators configuration contains unknown generator names.
+
+    Otherwise, a typo in a name would silently skip that generator (and its files would never be generated or checked).
+
+    :param generators: The raw generators configuration.
+    :raises ValueError: If there is an unknown generator name.
+    """
+    if not isinstance(generators, dict):
+        return
+    known = sorted(Generators.model_fields)
+    unknown = [name for name in generators if name not in known]
+    if not unknown:
+        return
+
+    problems = []
+    for name in unknown:
+        suggestion = difflib.get_close_matches(name, known, n=1)
+        hint = f" Did you mean {suggestion[0]!r}?" if suggestion else ""
+        problems.append(f"Unknown generator {name!r}.{hint}")
+    raise ValueError(f"{' '.join(problems)} Available generators: {', '.join(known)}.")
 
 
 class PSECLISettings(PSESettings):
@@ -116,6 +139,8 @@ class PSECLISettings(PSESettings):
                     stacklevel=2,
                 )
                 generators[name] = [gen_configs]
+
+        _check_unknown_generators(generators)
         return data
 
     @model_validator(mode="before")
@@ -471,6 +496,26 @@ def _export(
     parser.exit(0, "No files generated.\n")
 
 
+def _setup_settings_or_exit(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+) -> tuple[PSECLISettings, list[Path], str]:
+    """Initialize settings from the parsed arguments, or exit with an error message.
+
+    :param parser: The argument parser used to exit.
+    :param args: The parsed arguments.
+    :return: Tuple of (configured PSECLISettings instance, venv packages added, venv display label)
+    """
+    try:
+        return _setup_settings(args.config_file, args.project_dir, args.venv)
+    except ValidationError as e:
+        parser.error(f"Invalid configuration: {e}")
+    except (RuntimeError, FileNotFoundError, ValueError) as e:
+        parser.error(f"Venv configuration error: {e}")
+    except Exception as e:
+        parser.error(f"Failed to initialize settings: {e}")
+
+
 def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     parser = make_parser()
     args: argparse.Namespace = parser.parse_args(parse_args)
@@ -479,12 +524,7 @@ def main(parse_args: Sequence[str] | None = None) -> None:  # noqa: D103
     _load_env_files(args.env_file)
 
     # Setup settings
-    try:
-        s, venv_packages, venv_label = _setup_settings(args.config_file, args.project_dir, args.venv)
-    except (RuntimeError, FileNotFoundError, ValueError) as e:
-        parser.error(f"Venv configuration error: {e}")
-    except Exception as e:
-        parser.error(f"Failed to initialize settings: {e}")
+    s, venv_packages, venv_label = _setup_settings_or_exit(parser, args)
 
     # Override default_settings with CLI-provided settings (full replacement)
     if args.settings:
